@@ -1,0 +1,14 @@
+[build]
+  functions = "netlify/functions"
+
+# Le jeu (index.html) et le service worker appellent toujours "./gamedata.json".
+# Cette redirection fait pointer cette même URL vers la fonction serverless qui
+# sert soit les dernières données déployées depuis l'admin (Netlify Blobs), soit,
+# à défaut, le gamedata.json de démonstration livré avec le site.
+# force = true est nécessaire car un vrai fichier gamedata.json existe aussi à la
+# racine du site (utilisé comme donnée de secours par la fonction elle-même).
+[[redirects]]
+  from = "/gamedata.json"
+  to = "/.netlify/functions/gamedata"
+  status = 200
+  force = true
