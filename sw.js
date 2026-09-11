@@ -1,4 +1,4 @@
-const CACHE = 'pokenevers-v2';
+const CACHE = 'pokenevers-v3';
 const APP_SHELL = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', (e) => {
@@ -27,8 +27,13 @@ self.addEventListener('fetch', (e) => {
     e.respondWith(
       fetch(e.request)
         .then((res) => {
-          const copy = res.clone();
-          caches.open(CACHE).then((c) => c.put(e.request, copy));
+          // Ne jamais mettre en cache une erreur (404/500/...) : sinon une panne
+          // temporaire resterait servie indéfiniment depuis le cache du navigateur,
+          // même une fois le vrai problème corrigé côté serveur.
+          if (res.ok) {
+            const copy = res.clone();
+            caches.open(CACHE).then((c) => c.put(e.request, copy));
+          }
           return res;
         })
         .catch(() => caches.match(e.request))
@@ -41,8 +46,11 @@ self.addEventListener('fetch', (e) => {
       if (cached) return cached;
       return fetch(e.request)
         .then((res) => {
-          const copy = res.clone();
-          caches.open(CACHE).then((c) => c.put(e.request, copy));
+          // Même précaution ici : une réponse non-OK ne doit jamais être mise en cache.
+          if (res.ok) {
+            const copy = res.clone();
+            caches.open(CACHE).then((c) => c.put(e.request, copy));
+          }
           return res;
         })
         .catch(() => cached);
