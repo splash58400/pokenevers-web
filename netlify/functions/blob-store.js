@@ -14,7 +14,7 @@
 // des variables d'environnement définies à la main sur Netlify.
 // - BLOBS_SITE_ID : le "Project ID" / "Site ID" visible dans
 //   Project configuration → General → Project information.
-// - NETLIFY_BLOBS_TOKEN : un "Personal access token" Netlify
+// - BLOBS_TOKEN : un "Personal access token" Netlify
 //   (User settings → Applications → New access token).
 // Voir DEPLOIEMENT.md pour la procédure complète.
 "use strict";
@@ -25,8 +25,8 @@ function getConfigError() {
   if (!process.env.BLOBS_SITE_ID) {
     return "La variable d'environnement BLOBS_SITE_ID n'est pas configurée sur Netlify (voir DEPLOIEMENT.md, étape Netlify Blobs).";
   }
-  if (!process.env.NETLIFY_BLOBS_TOKEN) {
-    return "La variable d'environnement NETLIFY_BLOBS_TOKEN n'est pas configurée sur Netlify (voir DEPLOIEMENT.md, étape Netlify Blobs).";
+  if (!process.env.BLOBS_TOKEN) {
+    return "La variable d'environnement BLOBS_TOKEN n'est pas configurée sur Netlify (voir DEPLOIEMENT.md, étape Netlify Blobs).";
   }
   return null;
 }
@@ -36,7 +36,7 @@ function getConfiguredStore(name) {
   if (err) throw new Error(err);
   return getStore(name, {
     siteID: process.env.BLOBS_SITE_ID,
-    token: process.env.NETLIFY_BLOBS_TOKEN
+    token: process.env.BLOBS_TOKEN
   });
 }
 
