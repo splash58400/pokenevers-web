@@ -871,9 +871,10 @@ function doThrow(){
   capture.running=false; capture.resolved=true;
   const zoneW = RARITY_ZONE[capture.species.rarity];
   const inZone = capture.pos>=capture.zoneStart && capture.pos<=capture.zoneStart+zoneW;
-  const centerDist = Math.abs(capture.pos-(capture.zoneStart+zoneW/2))/(zoneW/2);
-  const accuracy = inZone ? (1-centerDist*0.5) : 0;
-  const success = inZone ? (Math.random() < 0.55 + accuracy*0.45) : (Math.random() < 0.06);
+  // Toucher la zone verte = capture de la manche, point final (comme l'indique le texte à l'écran) :
+  // la difficulté vient de la largeur de zone (par rareté), du nombre de manches à enchaîner et
+  // de la vitesse croissante de l'aiguille — pas d'un tirage au sort caché après un tir pourtant réussi.
+  const success = inZone ? true : (Math.random() < 0.06);
   const portrait = document.getElementById('capturePortrait');
   document.getElementById('throwBtn').style.visibility='hidden';
   portrait.classList.add('shake');
