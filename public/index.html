@@ -1,0 +1,1197 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>PokeNevers</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1e5aa8">
+<meta name="description" content="Capturez les commerçants de Nevers sur une vraie carte, en vous promenant en ville.">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="PokeNevers">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+:root{
+  --ink:#182333; --ink-soft:#51617a; --ink-faint:#8695ab;
+  --bg:#eaf1f8; --surface:#ffffff; --surface-alt:#f3efe4;
+  --line:#d7e2ee;
+  --blue-700:#123b6b; --blue-600:#1e5aa8; --blue-500:#2f74c9; --blue-100:#dbeafc;
+  --gold:#d9a441; --gold-dark:#a97a1f; --gold-100:#faeecd;
+  --brick:#c1502e; --brick-dark:#963c22;
+  --green:#4f8f5c; --green-100:#dcf0e0;
+  --rarity-commun:#6f8298; --rarity-peu:#3e8e63; --rarity-rare:#7b5bc4; --rarity-legendaire:#d9a441;
+  --shadow-sm:0 2px 8px rgba(18,42,79,.10);
+  --shadow-lg:0 16px 40px rgba(18,42,79,.20);
+  --radius-lg:24px; --radius-md:16px; --radius-sm:10px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ink:#eaf1fb; --ink-soft:#aebedb; --ink-faint:#7c8bab;
+    --bg:#0d151f; --surface:#141f2c; --surface-alt:#1a2432;
+    --line:#25344a;
+    --blue-700:#bcdcff; --blue-600:#5c9eea; --blue-500:#3f7fca; --blue-100:#1c3859;
+    --gold:#e8bc63; --gold-dark:#f0cd85; --gold-100:#3a2f14;
+    --brick:#e2694a; --brick-dark:#c94f31;
+    --green:#6ec17e; --green-100:#123322;
+    --rarity-commun:#8ea0b8; --rarity-peu:#5db682; --rarity-rare:#a58af0; --rarity-legendaire:#e8bc63;
+    --shadow-sm:0 2px 10px rgba(0,0,0,.35);
+    --shadow-lg:0 18px 44px rgba(0,0,0,.5);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"]{
+  --ink:#eaf1fb; --ink-soft:#aebedb; --ink-faint:#7c8bab;
+  --bg:#0d151f; --surface:#141f2c; --surface-alt:#1a2432;
+  --line:#25344a;
+  --blue-700:#bcdcff; --blue-600:#5c9eea; --blue-500:#3f7fca; --blue-100:#1c3859;
+  --gold:#e8bc63; --gold-dark:#f0cd85; --gold-100:#3a2f14;
+  --brick:#e2694a; --brick-dark:#c94f31;
+  --green:#6ec17e; --green-100:#123322;
+  --rarity-commun:#8ea0b8; --rarity-peu:#5db682; --rarity-rare:#a58af0; --rarity-legendaire:#e8bc63;
+  --shadow-sm:0 2px 10px rgba(0,0,0,.35);
+  --shadow-lg:0 18px 44px rgba(0,0,0,.5);
+  color-scheme: dark;
+}
+*{box-sizing:border-box;}
+html,body{height:100%;}
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font-family:"Nunito",system-ui,-apple-system,sans-serif;
+  font-variant-numeric:tabular-nums;
+  overflow:hidden;
+  -webkit-tap-highlight-color:transparent;
+  user-select:none;
+}
+h1,h2,h3,.display{ font-family:"Fredoka",system-ui,sans-serif; text-wrap:balance; }
+button{font-family:inherit;}
+#app{position:fixed; inset:0; display:flex; flex-direction:column;}
+
+/* ---------- top status bar ---------- */
+#statusBar{
+  position:absolute; top:0; left:0; right:0; z-index:410;
+  display:flex; justify-content:space-between; align-items:flex-start;
+  padding:calc(10px + env(safe-area-inset-top,0px)) 12px 0 12px;
+  pointer-events:none;
+}
+.pill{
+  pointer-events:auto;
+  display:flex; align-items:center; gap:6px;
+  background:color-mix(in srgb, var(--surface) 90%, transparent);
+  backdrop-filter:blur(8px);
+  border:1px solid var(--line);
+  border-radius:999px; padding:6px 12px 6px 6px;
+  box-shadow:var(--shadow-sm);
+  font-weight:800; font-size:13px;
+}
+.pill .badge-circle{
+  width:26px;height:26px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  background:var(--blue-600); color:#fff; font-family:"Fredoka"; font-size:13px;
+  flex:none;
+}
+.pill.gold .badge-circle{background:var(--gold); color:var(--blue-700);}
+.pill .xpbar{width:52px;height:5px;border-radius:3px;background:var(--line);overflow:hidden;margin-top:2px;}
+.pill .xpbar > i{display:block;height:100%;background:var(--blue-600);}
+.pill small{display:block;font-size:9px;font-weight:700;color:var(--ink-faint);letter-spacing:.04em;text-transform:uppercase;}
+
+/* ---------- MAP VIEW (Leaflet) ---------- */
+#mapView{position:absolute;inset:0;overflow:hidden;background:var(--bg);}
+/* mapRotator is oversized (150%) so rotating it in compass mode never reveals empty corners;
+   #mapView clips it back down with overflow:hidden. */
+#mapRotator{position:absolute; top:50%; left:50%; width:150%; height:150%; transform-origin:50% 50%; will-change:transform;
+  transform:translate(-50%,-50%) rotate(0deg);}
+#leafletMap{position:absolute;inset:0;}
+.leaflet-div-icon{background:transparent!important; border:none!important;}
+.leaflet-control-attribution{font-size:9.5px!important;}
+
+/* .pmarker is the element Leaflet itself positions (translate3d) — never set transform on it directly.
+   .pmarker-rot is the inner element the compass-mode code rotates instead. */
+.pmarker{display:flex; justify-content:center; pointer-events:none;}
+.pmarker-rot{display:flex; flex-direction:column; align-items:center;}
+.pmarker .dot{width:24px;height:24px;border-radius:50%; background:var(--brick); border:3px solid #fff;
+  box-shadow:0 0 0 4px color-mix(in srgb, var(--brick) 35%, transparent), var(--shadow-sm);}
+.pmarker .label{margin-top:4px;font-size:10px;font-weight:800;background:var(--surface);padding:2px 8px;border-radius:8px;box-shadow:var(--shadow-sm);white-space:nowrap;}
+
+.smarker{display:flex; flex-direction:column; align-items:center; cursor:pointer; animation:bob 2.6s ease-in-out infinite;}
+@keyframes bob{0%,100%{transform:translateY(0);}50%{transform:translateY(-6px);}}
+.smarker .badge{width:50px;height:50px;border-radius:50%; display:flex;align-items:center;justify-content:center;
+  background:var(--surface); box-shadow:var(--shadow-lg); border:3px solid var(--mc, var(--blue-600)); position:relative;}
+.smarker .badge svg{width:25px;height:25px; stroke:var(--mc, var(--blue-600));}
+.smarker .stem{width:4px;height:11px;background:var(--mc, var(--blue-600));margin-top:-2px;border-radius:2px;}
+.smarker.far{opacity:.5; filter:grayscale(.3);}
+.smarker .ring-pulse{position:absolute; inset:-6px; border-radius:50%; border:2px solid var(--mc,var(--blue-600)); opacity:0; animation:pulse 2.2s ease-out infinite;}
+@keyframes pulse{0%{opacity:.55;transform:scale(.8);}100%{opacity:0;transform:scale(1.5);}}
+.smarker.poi .badge{background:var(--gold-100); border-color:var(--gold);}
+.smarker.poi .badge svg{stroke:var(--gold-dark);}
+.smarker.shiny .badge{box-shadow:0 0 0 3px var(--mc), 0 0 16px 4px color-mix(in srgb, var(--mc) 55%, transparent), var(--shadow-lg);}
+.shiny-spark{position:absolute; top:-9px; right:-7px; font-size:15px; filter:drop-shadow(0 1px 1px rgba(0,0,0,.35)); animation:spark-pulse 1.6s ease-in-out infinite;}
+@keyframes spark-pulse{0%,100%{transform:scale(1);}50%{transform:scale(1.3);}}
+.capture-portrait.shiny{box-shadow:0 0 0 4px var(--rarity), 0 0 22px 6px color-mix(in srgb, var(--rarity) 55%, transparent);}
+
+.map-toast{
+  position:absolute; left:50%; top:calc(64px + env(safe-area-inset-top,0px)); transform:translateX(-50%);
+  background:var(--surface); border:1px solid var(--line); box-shadow:var(--shadow-sm);
+  padding:8px 14px; border-radius:999px; font-size:12px; font-weight:700; color:var(--ink-soft);
+  z-index:420; max-width:88vw; text-align:center;
+}
+.geo-banner{
+  position:absolute; left:12px; right:12px; top:calc(64px + env(safe-area-inset-top,0px)); z-index:421;
+  background:var(--surface); border:1px solid var(--line); box-shadow:var(--shadow-lg);
+  border-radius:16px; padding:12px 14px; display:none; align-items:center; gap:10px;
+}
+.geo-banner .geo-banner-text{flex:1; font-size:12px; font-weight:700; color:var(--ink-soft); line-height:1.4;}
+.geo-banner button{
+  flex:none; background:var(--blue-600); color:#fff; border:none; border-radius:999px;
+  padding:9px 14px; font-family:"Fredoka"; font-weight:600; font-size:12.5px; cursor:pointer;
+}
+.recenter-btn{
+  position:absolute; right:14px; bottom:100px; z-index:400; width:44px;height:44px;border-radius:50%;
+  background:var(--surface); border:1px solid var(--line); box-shadow:var(--shadow-lg);
+  display:flex; align-items:center; justify-content:center;
+}
+.recenter-btn svg{width:20px;height:20px;stroke:var(--blue-600);}
+.recenter-btn.following svg{stroke:var(--brick);}
+#compassBtn{bottom:154px;}
+#compassBtn.active svg{stroke:var(--brick);}
+
+/* ---------- bottom nav ---------- */
+#tabbar{
+  position:relative; z-index:410;
+  display:flex; justify-content:space-around; align-items:stretch;
+  padding:8px 6px calc(8px + env(safe-area-inset-bottom,0px)) 6px;
+  background:color-mix(in srgb, var(--surface) 92%, transparent);
+  backdrop-filter:blur(10px);
+  border-top:1px solid var(--line);
+}
+.tab{
+  flex:1; display:flex; flex-direction:column; align-items:center; gap:3px;
+  background:none; border:none; padding:6px 2px; color:var(--ink-faint); font-weight:800; font-size:10.5px;
+  letter-spacing:.01em;
+}
+.tab svg{width:22px;height:22px; stroke:var(--ink-faint); transition:stroke .15s;}
+.tab.active{color:var(--blue-600);}
+.tab.active svg{stroke:var(--blue-600);}
+.tab .dot-ind{width:5px;height:5px;border-radius:50%;background:var(--blue-600);opacity:0;margin-top:-1px;}
+.tab.active .dot-ind{opacity:1;}
+
+/* ---------- generic screen scaffold ---------- */
+.screen{position:absolute; inset:0; overflow-y:auto; padding:calc(16px + env(safe-area-inset-top,0px)) 16px calc(96px + env(safe-area-inset-bottom,0px)) 16px; background:var(--bg);}
+.screen h1{font-size:22px; margin:4px 0 2px 0; color:var(--ink);}
+.screen .sub{color:var(--ink-soft); font-size:13px; margin:0 0 16px 0; font-weight:700;}
+
+/* ---------- dex grid ---------- */
+.dex-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(96px,1fr)); gap:10px;}
+.dex-card{
+  background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-md);
+  padding:10px 6px 8px 6px; display:flex; flex-direction:column; align-items:center; gap:6px;
+  box-shadow:var(--shadow-sm); cursor:pointer;
+}
+.icon-wrap{
+  width:56px;height:56px;border-radius:50%; display:flex; align-items:center; justify-content:center;
+  background:var(--surface-alt); border:2.5px solid var(--rarity, var(--rarity-commun)); flex:none; position:relative;
+}
+.dex-shiny-spark{position:absolute; top:-6px; right:-4px; font-size:13px; filter:drop-shadow(0 1px 1px rgba(0,0,0,.3));}
+.tag-shiny{display:inline-flex; align-items:center; gap:4px; font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.04em; padding:3px 9px; border-radius:6px; background:linear-gradient(135deg,var(--gold),var(--gold-dark)); color:#3a2a08;}
+.icon-wrap svg{width:28px;height:28px; stroke:var(--rarity, var(--rarity-commun));}
+.dex-card.locked .icon-wrap{filter:grayscale(1) brightness(.75); opacity:.55; border-color:var(--line);}
+.dex-card .name{font-size:11.5px; font-weight:800; text-align:center; line-height:1.15;}
+.dex-card .stagepips{display:flex; gap:3px;}
+.dex-card .stagepips i{width:5px;height:5px;border-radius:50%;background:var(--line);}
+.dex-card .stagepips i.on{background:var(--rarity, var(--rarity-commun));}
+.rarity-tag{font-size:8.5px; font-weight:800; text-transform:uppercase; letter-spacing:.05em; padding:2px 7px; border-radius:6px;}
+.rarity-tag.commun{background:color-mix(in srgb, var(--rarity-commun) 20%, transparent); color:var(--rarity-commun);}
+.rarity-tag.peu-commun{background:color-mix(in srgb, var(--rarity-peu) 18%, transparent); color:var(--rarity-peu);}
+.rarity-tag.rare{background:color-mix(in srgb, var(--rarity-rare) 18%, transparent); color:var(--rarity-rare);}
+.rarity-tag.legendaire{background:color-mix(in srgb, var(--rarity-legendaire) 22%, transparent); color:var(--rarity-legendaire);}
+
+/* ---------- sheet / modal ---------- */
+.sheet-backdrop{position:fixed; inset:0; background:rgba(10,18,30,.45); z-index:600; display:flex; align-items:flex-end; justify-content:center;}
+.sheet{
+  width:100%; max-width:480px; background:var(--surface); border-radius:26px 26px 0 0;
+  box-shadow:var(--shadow-lg); max-height:88vh; overflow-y:auto;
+  padding:10px 20px calc(24px + env(safe-area-inset-bottom,0px)) 20px;
+  animation:sheetup .25s ease-out;
+}
+@keyframes sheetup{from{transform:translateY(30px);opacity:0;}to{transform:translateY(0);opacity:1;}}
+.sheet-handle{width:38px;height:5px;border-radius:3px;background:var(--line);margin:0 auto 14px auto;}
+.btn{
+  border:none; border-radius:999px; font-family:"Fredoka"; font-weight:600; font-size:15px;
+  padding:13px 20px; cursor:pointer; width:100%; text-align:center;
+}
+.btn-primary{background:var(--blue-600); color:#fff; box-shadow:0 6px 16px color-mix(in srgb, var(--blue-600) 45%, transparent);}
+.btn-gold{background:var(--gold); color:var(--blue-700); box-shadow:0 6px 16px color-mix(in srgb, var(--gold) 45%, transparent);}
+.btn-ghost{background:var(--surface-alt); color:var(--ink);}
+.btn:disabled{opacity:.45; cursor:not-allowed;}
+input.text-input{
+  width:100%; border:2px solid var(--line); background:var(--surface-alt); border-radius:var(--radius-sm);
+  padding:12px 14px; font-size:16px; color:var(--ink); font-family:inherit; font-weight:700;
+}
+input.text-input:focus{outline:none; border-color:var(--blue-600);}
+
+/* ---------- capture screen ---------- */
+#captureView{position:fixed; inset:0; z-index:700; background:linear-gradient(180deg, var(--blue-100), var(--bg) 70%); display:flex; flex-direction:column;}
+.capture-top{display:flex; justify-content:space-between; align-items:center; padding:calc(14px + env(safe-area-inset-top,0px)) 16px 0 16px;}
+.capture-close{background:var(--surface); border:1px solid var(--line); border-radius:50%; width:38px;height:38px; display:flex; align-items:center; justify-content:center; box-shadow:var(--shadow-sm);}
+.capture-stage{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; padding:10px 20px;}
+.capture-portrait{
+  width:150px;height:150px;border-radius:50%; display:flex; align-items:center; justify-content:center;
+  background:var(--surface); box-shadow:var(--shadow-lg); border:5px solid var(--rarity, var(--blue-600));
+  position:relative;
+}
+.capture-portrait svg{width:76px;height:76px; stroke:var(--rarity, var(--blue-600));}
+.capture-portrait.shake{animation:shake .35s ease-in-out;}
+@keyframes shake{0%,100%{transform:translateX(0) rotate(0);}25%{transform:translateX(-8px) rotate(-4deg);}75%{transform:translateX(8px) rotate(4deg);}}
+.capture-name{font-family:"Fredoka"; font-size:20px; margin:0;}
+.capture-track{
+  width:min(88vw,340px); height:14px; border-radius:8px; background:var(--surface-alt); border:1px solid var(--line);
+  position:relative; overflow:hidden; margin-top:6px;
+}
+.capture-track .zone{position:absolute; top:0; bottom:0; background:color-mix(in srgb, var(--green) 45%, transparent); border-left:2px solid var(--green); border-right:2px solid var(--green);}
+.capture-track .needle{position:absolute; top:-4px; bottom:-4px; width:4px; background:var(--brick); border-radius:2px;}
+.capture-hint{font-size:12px; color:var(--ink-soft); font-weight:700;}
+.card-throw{
+  width:74px;height:74px;border-radius:50%; background:radial-gradient(circle at 35% 30%, var(--gold), var(--gold-dark));
+  border:none; box-shadow:var(--shadow-lg); margin:14px 0 4px 0; display:flex; align-items:center; justify-content:center;
+}
+.card-throw svg{width:30px;height:30px; stroke:#3a2a08;}
+.capture-result{font-family:"Fredoka"; font-size:24px; text-align:center;}
+.capture-result.success{color:var(--green);}
+.capture-result.fail{color:var(--brick);}
+
+/* ---------- onboarding ---------- */
+#onboardBackdrop{position:fixed; inset:0; background:linear-gradient(160deg, var(--blue-700), var(--blue-600) 55%, var(--gold) 160%); z-index:800; display:flex; align-items:center; justify-content:center; padding:24px;}
+.onboard-card{width:min(92vw,420px); background:var(--surface); border-radius:28px; padding:28px 24px; box-shadow:var(--shadow-lg); text-align:center;}
+.onboard-logo{font-family:"Fredoka"; font-weight:700; font-size:30px; color:var(--blue-600); margin:0 0 2px 0;}
+.onboard-logo .accent{color:var(--gold-dark);}
+.onboard-tag{font-size:12.5px; color:var(--ink-soft); font-weight:700; margin:0 0 20px 0;}
+
+.event-card{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-md); padding:16px; margin-bottom:12px; box-shadow:var(--shadow-sm);}
+.event-card.live{border-color:var(--gold); background:linear-gradient(135deg, var(--gold-100), var(--surface) 70%);}
+.event-tag{font-size:10px; font-weight:800; letter-spacing:.05em; text-transform:uppercase; padding:3px 9px; border-radius:6px; background:var(--green-100); color:var(--green);}
+.event-tag.upcoming{background:var(--blue-100); color:var(--blue-600);}
+.event-tag.live{background:var(--gold); color:var(--blue-700);}
+.mission-progress{width:100%;height:8px;border-radius:4px;background:var(--line);overflow:hidden;margin-top:4px;}
+.mission-progress > i{display:block;height:100%;border-radius:4px;}
+
+.profile-stat{display:flex; justify-content:space-between; align-items:center; padding:12px 0; border-bottom:1px solid var(--line);}
+.profile-stat:last-child{border-bottom:none;}
+.badge-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-top:8px;}
+.badge-item{display:flex; flex-direction:column; align-items:center; gap:4px; opacity:.35;}
+.badge-item.earned{opacity:1;}
+.badge-circle-lg{width:52px;height:52px;border-radius:50%; background:var(--gold-100); border:2px solid var(--gold); display:flex; align-items:center; justify-content:center;}
+.badge-circle-lg svg{width:24px;height:24px; stroke:var(--gold-dark);}
+.badge-item span{font-size:9px; font-weight:800; text-align:center;}
+
+.info-note{font-size:11.5px; color:var(--ink-faint); font-weight:700; line-height:1.5; background:var(--surface-alt); border-radius:var(--radius-sm); padding:10px 12px; margin-top:14px;}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="statusBar"></div>
+
+  <div id="mapView">
+    <div id="mapRotator"><div id="leafletMap"></div></div>
+    <div class="geo-banner" id="geoBanner">
+      <span class="geo-banner-text"></span>
+      <button id="geoRetryBtn" type="button">Activer le GPS</button>
+    </div>
+    <button class="recenter-btn" id="compassBtn" title="Boussole (rotation de la carte)"></button>
+    <button class="recenter-btn following" id="recenterBtn" title="Recentrer"></button>
+  </div>
+
+  <div id="dexScreen" class="screen" style="display:none;"></div>
+  <div id="eventsScreen" class="screen" style="display:none;"></div>
+  <div id="missionsScreen" class="screen" style="display:none;"></div>
+  <div id="profileScreen" class="screen" style="display:none;"></div>
+
+  <div id="tabbar"></div>
+</div>
+
+<div id="modalRoot"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(function(){
+"use strict";
+
+/* ============================= ICONS ============================= */
+const ICONS = {
+  bread:'<path d="M4 13c0-3.5 3-6.5 8-6.5s8 3 8 6.5-2 6-8 6-8-2.5-8-6Z"/><path d="M8 10.5v4M12 9.5v5M16 10.5v4" stroke-linecap="round"/>',
+  cheese:'<path d="M3 17 12 6l9 11H3Z"/><circle cx="13" cy="14" r="1"/><circle cx="9" cy="15.5" r="1"/><circle cx="16" cy="15" r="1"/>',
+  wine:'<path d="M7 4h10l-1.2 8.2a3.8 3.8 0 0 1-3.8 3.3 3.8 3.8 0 0 1-3.8-3.3L7 4Z"/><path d="M12 15.5V21M8.5 21h7"/>',
+  flower:'<circle cx="12" cy="8" r="2.4"/><circle cx="7.5" cy="11" r="2.4"/><circle cx="16.5" cy="11" r="2.4"/><circle cx="9.5" cy="15.5" r="2.4"/><circle cx="14.5" cy="15.5" r="2.4"/><circle cx="12" cy="12.5" r="1.6" fill="currentColor" stroke="none"/><path d="M12 17.5V21" stroke-linecap="round"/>',
+  chocolate:'<rect x="4" y="7" width="16" height="11" rx="1.5"/><path d="M4 12.5h16M9.3 7v11M14.7 7v11"/>',
+  coffee:'<path d="M5 9h11v6a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4V9Z"/><path d="M16 10.5h1.6a2.4 2.4 0 0 1 0 4.8H16"/><path d="M8 5.2c0 1-1 1-1 2M12 5.2c0 1-1 1-1 2" stroke-linecap="round"/>',
+  antique:'<path d="M6 20h12M9 20V9.5M15 20V9.5"/><path d="M4 9.5h16L18 4H6L4 9.5Z"/><circle cx="12" cy="14" r="2"/>',
+  vase:'<path d="M9.5 3h5l.6 3.4c1.6 1.7 2.4 3.4 2.4 5.6 0 4-2.7 9-5.5 9s-5.5-5-5.5-9c0-2.2.8-3.9 2.4-5.6L9.5 3Z"/><path d="M9 3h6" stroke-linecap="round"/>',
+  basket:'<path d="M4 10h16l-1.6 9.2a2 2 0 0 1-2 1.8H7.6a2 2 0 0 1-2-1.8L4 10Z"/><path d="M8 10 9.5 4M16 10 14.5 4M12 10v9" stroke-linecap="round"/>',
+  book:'<path d="M4 5.5C4 4.7 4.7 4 5.5 4H12v16H5.5A1.5 1.5 0 0 1 4 18.5v-13Z"/><path d="M20 5.5c0-.8-.7-1.5-1.5-1.5H12v16h6.5a1.5 1.5 0 0 0 1.5-1.5v-13Z"/>',
+  cathedral:'<path d="M12 3v3M8 6h8l2 5H6l2-5Z"/><path d="M7 11v9M17 11v9M4 20h16M10 20v-5h4v5"/>',
+  palace:'<path d="M4 20h16M5 20V10l7-5 7 5v10"/><path d="M9 20v-6h6v6M12 5v3"/>',
+  gate:'<path d="M6 20V9a6 6 0 0 1 12 0v11"/><path d="M4 20h16M9 20v-5h6v5"/>',
+  bridge:'<path d="M3 16c2-3 5-4.5 9-4.5S19 13 21 16"/><path d="M6 16v4M18 16v4M3 20h18"/>',
+  stall:'<path d="M4 9 12 4l8 5"/><path d="M5 9v10h14V9"/><path d="M9 19v-5h6v5" /><path d="M4 9h16" stroke-dasharray="2 2"/>',
+  compass:'<circle cx="12" cy="12" r="9"/><path d="M14.5 9.5 13 14l-4.5 1.5L10 11l4.5-1.5Z"/>',
+  close:'<path d="M6 6l12 12M18 6 6 18" stroke-linecap="round"/>',
+  star:'<path d="M12 3.5 14.4 9l6 .6-4.5 4 1.3 5.9L12 16.6 6.8 19.5l1.3-5.9-4.5-4 6-.6L12 3.5Z"/>',
+  map:'<path d="M9 4 4 6v14l5-2 6 2 5-2V4l-5 2-6-2Z"/><path d="M9 4v14M15 6v14"/>',
+  trophy:'<path d="M7 4h10v4a5 5 0 0 1-10 0V4Z"/><path d="M7 5H4v2a3 3 0 0 0 3 3M17 5h3v2a3 3 0 0 1-3 3"/><path d="M12 13v3M9 20h6M10 16.5h4v3.5h-4z"/>',
+  person:'<circle cx="12" cy="8.5" r="3.6"/><path d="M4.5 20c1.2-4 4-6 7.5-6s6.3 2 7.5 6"/>',
+  locate:'<circle cx="12" cy="12" r="2.6"/><path d="M12 2v3.4M12 18.6V22M2 12h3.4M18.6 12H22" stroke-linecap="round"/>',
+  flag:'<path d="M6 3v18"/><path d="M6 4h11l-2.5 3.5L17 11H6"/>'
+};
+function icon(name, extra){ return `<svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" ${extra||''}>${ICONS[name]||ICONS.star}</svg>`; }
+
+/* ============================= GEOGRAPHY ============================= */
+// Centre de référence : cœur historique de Nevers (Place Carnot / Cathédrale).
+const ORIGIN = { lat: 46.9899, lon: 3.1580 };
+// Coordonnées approximatives des lieux réels — à affiner une fois vérifiées sur place.
+const POI_DEFS = [
+  { name:'Cathédrale Saint-Cyr', icon:'cathedral', lat:46.9908, lon:3.1583 },
+  { name:'Palais Ducal', icon:'palace', lat:46.9895, lon:3.1567 },
+  { name:'Porte du Croux', icon:'gate', lat:46.9875, lon:3.1558 },
+  { name:'Pont de Loire', icon:'bridge', lat:46.9875, lon:3.1490 },
+  { name:'Halles du Marché', icon:'stall', lat:46.9890, lon:3.1600 },
+];
+
+/* ============================= DATA ============================= */
+const RARITY_LABEL = {commun:'Commun','peu-commun':'Peu commun', rare:'Rare', legendaire:'Légendaire'};
+const RARITY_CATCH = {commun:.78, 'peu-commun':.55, rare:.35, legendaire:.14};
+const RARITY_XP    = {commun:40, 'peu-commun':70, rare:120, legendaire:400};
+const RARITY_CANDY = {commun:3, 'peu-commun':3, rare:2, legendaire:1};
+const RARITY_ZONE  = {commun:.34, 'peu-commun':.26, rare:.19, legendaire:.13};
+
+const SPECIES = [
+  { id:'boulangerie', icon:'bread', rarity:'commun',
+    stages:[ {name:'Le Petit Pain', desc:"Une camionnette qui vend du pain chaud au coin de la rue, à l'odeur irrésistible.", need:8},
+             {name:'Boulangerie du Pont', desc:"Une échoppe fixe près du pont de Loire, réputée pour ses viennoiseries du dimanche.", need:20},
+             {name:'Fournil Doré', desc:"L'institution du quartier : une file d'attente tous les matins pour sa baguette signature.", need:null} ] },
+  { id:'marche', icon:'basket', rarity:'commun',
+    stages:[ {name:'Étal Ambulant', desc:"Un petit étal de fruits et légumes posé sur une place, replié le soir venu.", need:8},
+             {name:'Petit Marché', desc:"Une devanture ouverte sur la rue, avec ses cageots colorés bien rangés.", need:20},
+             {name:'Épicerie Renommée', desc:"Le repère des habitués, qui connaît le prénom de chaque client.", need:null} ] },
+  { id:'cafe', icon:'coffee', rarity:'commun',
+    stages:[ {name:'Kiosque à Café', desc:"Une petite guérite en bois où l'on prend son café en vitesse.", need:8},
+             {name:'Café de la Loire', desc:"Une terrasse avec vue sur le fleuve, parfaite pour observer les passants.", need:20},
+             {name:'Salon Doré', desc:"Un salon feutré aux banquettes de velours, célèbre pour son chocolat chaud.", need:null} ] },
+  { id:'fleuriste', icon:'flower', rarity:'commun',
+    stages:[ {name:'Étal Fleuri', desc:"Un seau de tulipes posé sur le trottoir, changé chaque matin.", need:8},
+             {name:'Jardin des Halles', desc:"Une boutique débordante de bouquets, ouverte sur la halle couverte.", need:20},
+             {name:'Serre Royale', desc:"Une véritable serre en ville, avec des compositions dignes d'un mariage.", need:null} ] },
+  { id:'fromagerie', icon:'cheese', rarity:'peu-commun',
+    stages:[ {name:'Étal à Fromage', desc:"Une glacière ambulante et une petite planche de dégustation.", need:10},
+             {name:'Crèmerie de la Place', desc:"Une vitrine réfrigérée bien garnie, avec plus de trente variétés locales.", need:25},
+             {name:'Maître Affineur', desc:"Une cave d'affinage à l'ancienne, gardée comme un secret de famille.", need:null} ] },
+  { id:'chocolatier', icon:'chocolate', rarity:'peu-commun',
+    stages:[ {name:'Comptoir Cacao', desc:"Un petit comptoir qui embaume le cacao chaud dès l'entrée.", need:10},
+             {name:'Chocolaterie Fine', desc:"Un atelier-boutique où l'on voit fondre le chocolat en vitrine.", need:25},
+             {name:'Palais du Chocolat', desc:"Une adresse gastronomique, primée pour ses créations originales.", need:null} ] },
+  { id:'librairie', icon:'book', rarity:'peu-commun',
+    stages:[ {name:'Bouquiniste', desc:"Une caisse de livres d'occasion posée sur un tréteau.", need:10},
+             {name:'Librairie de la Rue', desc:"Une boutique chaleureuse aux étagères qui montent jusqu'au plafond.", need:25},
+             {name:'Grand Bibliophile', desc:"Une institution littéraire qui organise des rencontres d'auteurs.", need:null} ] },
+  { id:'caviste', icon:'wine', rarity:'rare',
+    stages:[ {name:'Cave Voûtée', desc:"Une petite cave discrète nichée sous une maison ancienne.", need:14},
+             {name:'Grand Cru Nivernais', desc:"Une adresse réputée dans toute la région pour ses conseils avisés.", need:null} ] },
+  { id:'antiquaire', icon:'antique', rarity:'rare',
+    stages:[ {name:'Brocante du Vieux Nevers', desc:"Un capharnaüm d'objets chinés, entassés jusqu'à la porte.", need:14},
+             {name:'Cabinet de Curiosités', desc:"Une boutique élégante spécialisée dans la faïence ancienne.", need:null} ] },
+  { id:'faiencerie', icon:'vase', rarity:'legendaire',
+    stages:[ {name:'Maître Faïencier de Nevers', desc:"Le dernier atelier à peindre encore le bleu de Nevers à la main. Extrêmement rare.", need:null} ] },
+];
+
+function pad(n){return String(n).padStart(2,'0');}
+function d(y,m,day,h,mi){return new Date(y,m-1,day,h||0,mi||0,0);}
+const EVENTS = [
+  { id:'marche-automne', name:"Marché d'Automne", icon:'basket',
+    start:d(2026,9,1), end:d(2026,9,30,23,59),
+    desc:"Les étals de Fromagerie et de Marché apparaissent bien plus souvent sur la carte.",
+    bonus:"+50% d'apparitions Marché & Fromagerie" },
+  { id:'dernier-bal', name:"Le Dernier Bal — Nevers Hanté", icon:'star',
+    start:d(2026,10,31), end:d(2026,11,1,23,59),
+    desc:"Pour l'évènement Halloween d'ICOO Games à l'Espace des Saules : des versions hantées des commerçants apparaissent en ville.",
+    bonus:"x2 tampons de fidélité sur toutes les captures" },
+  { id:'inventaire-faience', name:"Grand Inventaire de Faïence", icon:'vase',
+    start:d(2026,12,5), end:d(2026,12,20,23,59),
+    desc:"Une saison spéciale où le Maître Faïencier de Nevers se montre bien plus souvent qu'à l'accoutumée.",
+    bonus:"Taux d'apparition légendaire boosté" },
+];
+function activeEvent(now){ return ACTIVE_EVENTS.find(e=> now>=e.start && now<=e.end) || null; }
+function eventBonusMultiplier(){
+  const ev = activeEvent(new Date());
+  if(ev && (ev.id==='dernier-bal' || ev.bonusType==='double_tampons')) return 2;
+  return 1;
+}
+
+/* ============================= UTILS ============================= */
+function mulberry32(seed){ return function(){ seed|=0; seed=seed+0x6D2B79F5|0; let t=Math.imul(seed^seed>>>15,1|seed); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+function destPoint(lat,lon,dx,dy){
+  const R=6371000, toRad=Math.PI/180;
+  const newLat = lat + (dy/R)*(180/Math.PI);
+  const newLon = lon + (dx/(R*Math.cos(lat*toRad)))*(180/Math.PI);
+  return {lat:newLat, lon:newLon};
+}
+function fmtDist(m){ return m<1000 ? Math.round(m)+' m' : (m/1000).toFixed(1)+' km'; }
+function fmtCountdown(target){
+  let diff = target - Date.now();
+  if(diff<=0) return null;
+  const days=Math.floor(diff/86400000); diff-=days*86400000;
+  const hours=Math.floor(diff/3600000); diff-=hours*3600000;
+  const mins=Math.floor(diff/60000);
+  if(days>0) return `${days} j ${pad(hours)} h`;
+  return `${pad(hours)} h ${pad(mins)} min`;
+}
+function xpForLevel(lvl){ return Math.round(60*lvl*lvl); }
+function levelFromXp(xp){ let lvl=1; while(xp>=xpForLevel(lvl+1) && lvl<40) lvl++; return lvl; }
+function escapeHtml(s){ return (s==null?'':String(s)).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function isShinyActive(shiny){
+  if(!shiny || !shiny.active) return false;
+  if(shiny.expiresAt){ return new Date(shiny.expiresAt).getTime() > Date.now(); }
+  return true;
+}
+// Keeps generated spawn points out of the river sector (west, ~150-210°) so they read as being on land.
+function randomLandAngle(rng){
+  let a;
+  for(let i=0;i<6;i++){
+    a = rng()*Math.PI*2;
+    const deg = ((a*180/Math.PI)+360)%360;
+    if(!(deg>145 && deg<215)) return a;
+  }
+  return a;
+}
+
+/* ============================= STATE ============================= */
+const RANGE_M = 60;
+const SPAWN_COUNT = 10;
+
+let state = null;
+function defaultState(){
+  return {
+    trainerName:null,
+    xp:0,
+    coins:0,
+    captures:{},
+    poiSpins:{},
+    totalPoiSpins:0,
+    captureCooldowns:{},
+    missionsCompleted:{},
+    seenIntro:false,
+    spawns:null, // generated once, persisted
+  };
+}
+function loadLocal(){
+  try{ const raw = localStorage.getItem('pokenevers_save_v1'); return raw? JSON.parse(raw): null; }
+  catch(e){ return null; }
+}
+function saveLocal(){
+  try{ localStorage.setItem('pokenevers_save_v1', JSON.stringify(state)); }catch(e){}
+}
+
+let map=null, tileLayer=null, rangeCircle=null, playerLeafletMarker=null;
+let spawnMarkers={}, poiMarkers={};
+let curLat=null, curLon=null;
+let usingFallback=false, firstFixDone=false, followMode=true;
+let geoWatchId=null;
+
+/* ============================= SPAWNS ============================= */
+function pickSpeciesForSpawn(rng){
+  const ev = activeEvent(new Date());
+  let pool = SPECIES.slice();
+  const weights = pool.map(sp=>{
+    let w = RARITY_CATCH[sp.rarity];
+    if(ev && ev.id==='marche-automne' && (sp.id==='marche'||sp.id==='fromagerie')) w*=2.2;
+    if(ev && ev.id==='inventaire-faience' && sp.id==='faiencerie') w*=6;
+    return Math.max(w,0.02);
+  });
+  const total = weights.reduce((a,b)=>a+b,0);
+  let r = rng()*total;
+  for(let i=0;i<pool.length;i++){ r-=weights[i]; if(r<=0) return pool[i]; }
+  return pool[0];
+}
+function genSpawn(rng, uid){
+  const sp = pickSpeciesForSpawn(rng);
+  const angle = randomLandAngle(rng);
+  const dist = 40 + rng()*280;
+  const pt = destPoint(ORIGIN.lat, ORIGIN.lon, Math.cos(angle)*dist, Math.sin(angle)*dist);
+  return {uid, speciesId:sp.id, lat:pt.lat, lon:pt.lon};
+}
+function getSpeciesById(id){ return ACTIVE_MERCHANTS.find(s=>s.id===id); }
+function ensureSpawns(){
+  if(usingLiveMerchants){
+    // Vrais commerçants : positions fixes, placées dans le panel admin — pas de tirage aléatoire.
+    state.spawns = ACTIVE_MERCHANTS.map(m=>({uid:m.id, speciesId:m.id, lat:m.lat, lon:m.lon}));
+    return;
+  }
+  if(state.spawns && state.spawns.length===SPAWN_COUNT) return;
+  const rng = mulberry32(20260911);
+  state.spawns = [];
+  for(let i=0;i<SPAWN_COUNT;i++) state.spawns.push(genSpawn(rng, 's'+i+'_'+Date.now()));
+  saveLocal();
+}
+function respawnOne(oldUid){
+  if(usingLiveMerchants) return; // un vrai commerçant reste à sa place ; voir captureCooldowns pour la re-capture.
+  const rng = mulberry32(Date.now()%100000);
+  const fresh = genSpawn(rng, 's'+Date.now());
+  const idx = state.spawns.findIndex(s=>s.uid===oldUid);
+  if(idx>=0) state.spawns[idx]=fresh; else state.spawns.push(fresh);
+  saveLocal();
+}
+
+/* ============================= MAP (Leaflet) ============================= */
+function divIcon(html, size, anchor, className){
+  return L.divIcon({ html, className: className||'', iconSize: size, iconAnchor: anchor });
+}
+function initMap(){
+  map = L.map('leafletMap', { zoomControl:false, attributionControl:true }).setView([ORIGIN.lat, ORIGIN.lon], 17);
+  tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors'
+  }).addTo(map);
+
+  rangeCircle = L.circle([ORIGIN.lat, ORIGIN.lon], {
+    radius: RANGE_M, color: '#1e5aa8', weight:2, dashArray:'5 5', fillColor:'#1e5aa8', fillOpacity:.06
+  }).addTo(map);
+
+  playerLeafletMarker = L.marker([ORIGIN.lat, ORIGIN.lon], {
+    icon: divIcon('<div class="pmarker-rot"><div class="dot"></div><div class="label">Vous</div></div>', [80,50], [40,13], 'pmarker'),
+    zIndexOffset: 1000, interactive:false
+  }).addTo(map);
+
+  ensureSpawns();
+  renderPoiMarkers();
+  renderSpawnMarkers();
+
+  map.on('dragstart', ()=>{ followMode=false; updateRecenterBtn(); });
+  document.getElementById('recenterBtn').addEventListener('click', ()=>{
+    followMode=true; updateRecenterBtn();
+    if(curLat!==null) map.panTo([curLat,curLon], {animate:true});
+  });
+  document.getElementById('recenterBtn').innerHTML = icon('locate');
+  updateRecenterBtn();
+
+  document.getElementById('compassBtn').innerHTML = icon('compass');
+  document.getElementById('compassBtn').addEventListener('click', ()=>{
+    if(compassMode) disableCompass(); else enableCompass();
+  });
+}
+function updateRecenterBtn(){
+  document.getElementById('recenterBtn').classList.toggle('following', followMode);
+}
+
+/* ---- compass mode: rotate the map so "forward" is always up ---- */
+let compassMode=false, lastAppliedHeading=null, compassListenerAttached=false;
+function getCompassHeading(ev){
+  if(typeof ev.webkitCompassHeading === 'number' && !isNaN(ev.webkitCompassHeading)) return ev.webkitCompassHeading; // iOS Safari: already a true compass heading
+  if(ev.alpha!=null){
+    const screenAngle = (screen.orientation && typeof screen.orientation.angle==='number') ? screen.orientation.angle : (window.orientation||0);
+    let heading = 360 - ev.alpha + screenAngle;
+    heading = ((heading % 360) + 360) % 360;
+    return heading;
+  }
+  return null;
+}
+function applyMapRotation(headingDeg){
+  const rotator = document.getElementById('mapRotator');
+  if(rotator) rotator.style.transform = `translate(-50%,-50%) rotate(${-headingDeg}deg)`;
+  const pEl = playerLeafletMarker && playerLeafletMarker.getElement();
+  const pInner = pEl && pEl.querySelector('.pmarker-rot');
+  if(pInner) pInner.style.transform = `rotate(${headingDeg}deg)`;
+}
+function onDeviceOrientation(ev){
+  if(!compassMode) return;
+  const heading = getCompassHeading(ev);
+  if(heading==null) return;
+  if(lastAppliedHeading!==null){
+    let diff = Math.abs(heading-lastAppliedHeading);
+    if(diff>180) diff = 360-diff;
+    if(diff<1.2) return; // ignore tiny jitter
+  }
+  lastAppliedHeading = heading;
+  requestAnimationFrame(()=> applyMapRotation(heading));
+}
+function disableCompass(){
+  compassMode=false;
+  document.getElementById('compassBtn').classList.remove('active');
+  applyMapRotation(0);
+}
+function enableCompass(){
+  if(!window.DeviceOrientationEvent){
+    showToast("La boussole n'est pas prise en charge par ce navigateur.");
+    return;
+  }
+  const start = ()=>{
+    compassMode=true;
+    document.getElementById('compassBtn').classList.add('active');
+    if(!compassListenerAttached){
+      const evName = ('ondeviceorientationabsolute' in window) ? 'deviceorientationabsolute' : 'deviceorientation';
+      window.addEventListener(evName, onDeviceOrientation);
+      compassListenerAttached = true;
+    }
+    showToast('Boussole activée : la carte tourne pour que "devant vous" reste en haut.');
+  };
+  if(typeof DeviceOrientationEvent.requestPermission === 'function'){
+    // iOS 13+ : doit être appelé depuis un geste utilisateur (le tap sur le bouton)
+    DeviceOrientationEvent.requestPermission().then(res=>{
+      if(res==='granted') start();
+      else showToast("Accès refusé au capteur d'orientation. Sur iPhone : Réglages > Safari > Mouvement et orientation, puis rechargez la page.");
+    }).catch(()=> showToast("Impossible d'accéder au capteur d'orientation sur cet appareil."));
+  } else {
+    start();
+  }
+}
+function renderPoiMarkers(){
+  Object.values(poiMarkers).forEach(m=> map.removeLayer(m));
+  poiMarkers = {};
+  ACTIVE_POIS.forEach((p,i)=>{
+    const el = L.marker([p.lat,p.lon], {
+      icon: divIcon(`<div class="smarker poi"><div class="badge">${icon(p.icon)}</div><div class="stem" style="background:var(--gold);"></div></div>`, [50,66], [25,66])
+    }).addTo(map);
+    el.on('click', ()=> onPoiTap(p, i));
+    poiMarkers[i]=el;
+  });
+}
+function renderSpawnMarkers(){
+  Object.values(spawnMarkers).forEach(m=> map.removeLayer(m));
+  spawnMarkers = {};
+  state.spawns.forEach(sp=>{
+    const species = getSpeciesById(sp.speciesId);
+    if(!species) return;
+    const shinyOn = isShinyActive(species.shiny);
+    const mc = shinyOn ? (species.shiny.color||'#d9a441') : `var(--rarity-${species.rarity})`;
+    const el = L.marker([sp.lat,sp.lon], {
+      icon: divIcon(`<div class="smarker ${shinyOn?'shiny':''}" style="--mc:${mc};"><div class="badge">${shinyOn?'<div class="shiny-spark">✨</div>':''}<div class="ring-pulse"></div>${icon(species.icon)}</div><div class="stem"></div></div>`, [50,66], [25,66])
+    }).addTo(map);
+    el.on('click', ()=> onSpawnTap(sp));
+    spawnMarkers[sp.uid]=el;
+  });
+}
+function onSpawnTap(sp){
+  if(curLat===null){ showToast('En attente de votre position GPS...'); return; }
+  const dist = map.distance([curLat,curLon],[sp.lat,sp.lon]);
+  if(dist>RANGE_M){ showToast(`Trop loin (${fmtDist(dist)}) — rapprochez-vous à moins de ${RANGE_M} m.`); return; }
+  if(usingLiveMerchants){
+    const last = state.captureCooldowns[sp.speciesId]||0;
+    const cooldownMs = 10*60*1000;
+    const remain = cooldownMs-(Date.now()-last);
+    if(remain>0){ showToast(`Revenez dans ${Math.ceil(remain/60000)} min pour retenter votre chance ici.`); return; }
+  }
+  openCapture(sp);
+}
+function onPoiTap(p,i){
+  if(curLat===null){ showToast('En attente de votre position GPS...'); return; }
+  const dist = map.distance([curLat,curLon],[p.lat,p.lon]);
+  if(dist>RANGE_M){ showToast(`Trop loin (${fmtDist(dist)}) — rapprochez-vous à moins de ${RANGE_M} m.`); return; }
+  spinPoi(p,i);
+}
+let toastTimer=null;
+function showToast(msg){
+  let t = document.querySelector('.map-toast');
+  if(!t){ t=document.createElement('div'); t.className='map-toast'; document.getElementById('mapView').appendChild(t); }
+  t.textContent = msg; t.style.display='block';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>{ t.style.display='none'; }, 3200);
+}
+function spinPoi(p,i){
+  const key = 'p'+i;
+  const last = state.poiSpins[key]||0;
+  const cooldownMs = 5*60*1000;
+  if(Date.now()-last < cooldownMs){
+    showToast(`${p.name} : revenez dans ${Math.ceil((cooldownMs-(Date.now()-last))/60000)} min.`);
+    return;
+  }
+  state.poiSpins[key]=Date.now();
+  state.totalPoiSpins = (state.totalPoiSpins||0)+1;
+  const cMin = p.rewardCoinsMin!=null?p.rewardCoinsMin:2, cMax = p.rewardCoinsMax!=null?p.rewardCoinsMax:4;
+  const mult = eventBonusMultiplier();
+  const gained = Math.round((cMin+Math.floor(Math.random()*(cMax-cMin+1)))*mult);
+  const xpGain = Math.round((p.rewardXp!=null?p.rewardXp:15)*mult);
+  state.coins += gained;
+  state.xp += xpGain;
+  saveLocal();
+  renderStatusBar();
+  showToast(`${p.name} : +${gained} tampons, +${xpGain} XP !`);
+  checkMissions();
+}
+
+/* ============================= GEO ============================= */
+const GEO_MESSAGES = {
+  unsupported: "La géolocalisation n'est pas prise en charge par ce navigateur — position simulée au centre de Nevers.",
+  denied: "Localisation refusée. Autorisez la position pour ce site dans les réglages de votre navigateur, puis appuyez sur Réessayer.",
+  timeout: "Le GPS met trop de temps à répondre (courant en intérieur). Sortez si possible et appuyez sur Réessayer.",
+  unavailable: "Position momentanément indisponible. Appuyez sur Réessayer.",
+};
+function startGeo(){
+  hideGeoBanner();
+  if(!('geolocation' in navigator)){ fallbackGeo('unsupported'); return; }
+  navigator.geolocation.getCurrentPosition(
+    pos=>{ usingFallback=false; onGeo(pos.coords.latitude,pos.coords.longitude); hideGeoBanner(); startWatch(); },
+    err=>{ const code=err&&err.code; fallbackGeo(code===1?'denied':(code===3?'timeout':'unavailable')); },
+    {enableHighAccuracy:true, timeout:10000}
+  );
+}
+function startWatch(){
+  if(geoWatchId!==null) return;
+  geoWatchId = navigator.geolocation.watchPosition(
+    pos=>{ usingFallback=false; onGeo(pos.coords.latitude,pos.coords.longitude); hideGeoBanner(); },
+    ()=>{},
+    {enableHighAccuracy:true, maximumAge:2000, timeout:12000}
+  );
+}
+function fallbackGeo(reason){
+  usingFallback=true;
+  if(curLat===null) onGeo(ORIGIN.lat, ORIGIN.lon);
+  showGeoBanner(GEO_MESSAGES[reason] || GEO_MESSAGES.unavailable);
+}
+function showGeoBanner(msg){
+  const b=document.getElementById('geoBanner'); if(!b) return;
+  b.querySelector('.geo-banner-text').textContent=msg; b.style.display='flex';
+}
+function hideGeoBanner(){ const b=document.getElementById('geoBanner'); if(b) b.style.display='none'; }
+function onGeo(lat,lon){
+  curLat=lat; curLon=lon;
+  if(!firstFixDone){
+    firstFixDone=true;
+    if(!usingFallback) setTimeout(()=> showToast('GPS réel activé · vraie carte OpenStreetMap.'), 400);
+  }
+  if(playerLeafletMarker) playerLeafletMarker.setLatLng([lat,lon]);
+  if(rangeCircle) rangeCircle.setLatLng([lat,lon]);
+  if(followMode && map) map.panTo([lat,lon], {animate:true, duration:0.4});
+}
+
+/* ============================= CAPTURE ============================= */
+let capture=null;
+function openCapture(sp){
+  const species = getSpeciesById(sp.speciesId);
+  const stageIdx = (state.captures[sp.speciesId]?.stage)||0;
+  const stage = species.stages[Math.min(stageIdx, species.stages.length-1)];
+  const zoneW = RARITY_ZONE[species.rarity];
+  const shinyOn = isShinyActive(species.shiny);
+  capture = { spawnUid:sp.uid, species, stage, running:true, pos:0, dir:1, speed:0.028, resolved:false,
+    zoneStart: Math.max(0.06, Math.min(1-zoneW-0.06, Math.random()*(1-zoneW))) };
+  const root = document.getElementById('modalRoot');
+  root.innerHTML = `
+    <div id="captureView">
+      <div class="capture-top"><button class="capture-close" id="captureCloseBtn">${icon('close','style="width:16px;height:16px;stroke:var(--ink-soft)"')}</button><div></div></div>
+      <div class="capture-stage">
+        <span class="rarity-tag ${species.rarity}">${RARITY_LABEL[species.rarity]}</span>
+        ${shinyOn?`<span class="tag-shiny">✨ ${escapeHtml(species.shiny.label||'Shiny')}</span>`:''}
+        <div class="capture-portrait ${shinyOn?'shiny':''}" id="capturePortrait" style="--rarity:${shinyOn?(species.shiny.color||'#d9a441'):`var(--rarity-${species.rarity})`};">${icon(species.icon)}</div>
+        <h2 class="capture-name">${escapeHtml(stage.name)}</h2>
+        <p class="capture-hint">Appuyez sur la carte quand l'aiguille est dans la zone verte.</p>
+        <div class="capture-track" id="captureTrack">
+          <div class="zone" id="captureZone" style="left:${capture.zoneStart*100}%; width:${zoneW*100}%;"></div>
+          <div class="needle" id="captureNeedle"></div>
+        </div>
+        <button class="card-throw" id="throwBtn">${icon('compass')}</button>
+        <div id="captureResultWrap"></div>
+      </div>
+    </div>`;
+  document.getElementById('captureCloseBtn').onclick = closeCapture;
+  document.getElementById('throwBtn').onclick = doThrow;
+  requestAnimationFrame(captureLoop);
+}
+function captureLoop(){
+  if(!capture || !capture.running) return;
+  capture.pos += capture.dir*capture.speed;
+  if(capture.pos>=1){ capture.pos=1; capture.dir=-1; }
+  if(capture.pos<=0){ capture.pos=0; capture.dir=1; }
+  const needle = document.getElementById('captureNeedle');
+  if(needle) needle.style.left = (capture.pos*100)+'%';
+  requestAnimationFrame(captureLoop);
+}
+function doThrow(){
+  if(!capture || capture.resolved) return;
+  capture.running=false; capture.resolved=true;
+  const zoneW = RARITY_ZONE[capture.species.rarity];
+  const inZone = capture.pos>=capture.zoneStart && capture.pos<=capture.zoneStart+zoneW;
+  const centerDist = Math.abs(capture.pos-(capture.zoneStart+zoneW/2))/(zoneW/2);
+  const accuracy = inZone ? (1-centerDist*0.5) : 0.15;
+  const base = RARITY_CATCH[capture.species.rarity];
+  const success = Math.random() < base*accuracy + (inZone?0.05:0);
+  const portrait = document.getElementById('capturePortrait');
+  document.getElementById('throwBtn').style.visibility='hidden';
+  portrait.classList.add('shake');
+  setTimeout(()=>{
+    const wrap = document.getElementById('captureResultWrap');
+    if(success){
+      applyCapture(capture.species, capture.spawnUid);
+      wrap.innerHTML = `<div class="capture-result success">Capturé !</div><p class="capture-hint">+${RARITY_XP[capture.species.rarity]} XP · +${RARITY_CANDY[capture.species.rarity]} tampons</p><button class="btn btn-primary" id="captureDoneBtn" style="margin-top:10px;">Continuer</button>`;
+    } else {
+      wrap.innerHTML = `<div class="capture-result fail">Il s'est échappé…</div><p class="capture-hint">Retentez votre chance sur un prochain passage.</p><button class="btn btn-ghost" id="captureDoneBtn" style="margin-top:10px;">Fermer</button>`;
+    }
+    document.getElementById('captureDoneBtn').onclick = closeCapture;
+  }, 380);
+}
+function applyCapture(species, spawnUid){
+  const mult = eventBonusMultiplier();
+  const entry = state.captures[species.id] || {stage:0, candy:0};
+  entry.candy += RARITY_CANDY[species.rarity]*mult;
+  entry.caughtAt = new Date().toISOString();
+  state.captures[species.id] = entry;
+  state.xp += RARITY_XP[species.rarity]*mult;
+  state.coins += Math.round(RARITY_CANDY[species.rarity]/2)*mult;
+  if(usingLiveMerchants) state.captureCooldowns[species.id] = Date.now();
+  saveLocal();
+  renderStatusBar();
+  respawnOne(spawnUid);
+  renderSpawnMarkers();
+  checkMissions();
+}
+function closeCapture(){ capture=null; document.getElementById('modalRoot').innerHTML=''; }
+
+/* ============================= STATUS BAR ============================= */
+function renderStatusBar(){
+  const bar = document.getElementById('statusBar');
+  const lvl = levelFromXp(state.xp);
+  const cur = xpForLevel(lvl), next = xpForLevel(lvl+1);
+  const pct = Math.max(0,Math.min(100, Math.round((state.xp-cur)/(next-cur)*100)));
+  bar.innerHTML = `
+    <div class="pill">
+      <div class="badge-circle">${lvl}</div>
+      <div><small>Niveau</small><div class="xpbar"><i style="width:${pct}%"></i></div></div>
+    </div>
+    <div class="pill gold">
+      <div>${icon('star', 'style="width:15px;height:15px;stroke:var(--gold-dark)"')}</div>
+      <div>${state.coins}<br><small style="margin-top:-2px;">tampons</small></div>
+    </div>`;
+}
+
+/* ============================= DEX SCREEN ============================= */
+function renderDex(){
+  const el = document.getElementById('dexScreen');
+  const caughtCount = Object.keys(state.captures).length;
+  let cards = ACTIVE_MERCHANTS.map(sp=>{
+    const entry = state.captures[sp.id];
+    const caught = !!entry;
+    const stageIdx = caught? Math.min(entry.stage, sp.stages.length-1) : 0;
+    const stage = sp.stages[stageIdx];
+    const pips = sp.stages.map((_,i)=>`<i class="${i<=stageIdx && caught?'on':''}"></i>`).join('');
+    const shinyOn = caught && isShinyActive(sp.shiny);
+    return `<div class="dex-card ${caught?'':'locked'}" data-sp="${sp.id}">
+      <div class="icon-wrap" style="--rarity:${shinyOn?(sp.shiny.color||'#d9a441'):`var(--rarity-${sp.rarity})`};">${shinyOn?'<span class="dex-shiny-spark">✨</span>':''}${icon(sp.icon)}</div>
+      <div class="name">${caught? escapeHtml(stage.name) : '???'}</div>
+      <div class="stagepips">${pips}</div>
+    </div>`;
+  }).join('');
+  el.innerHTML = `<h1>Commerçants</h1><p class="sub">${caughtCount} / ${ACTIVE_MERCHANTS.length} découverts</p><div class="dex-grid">${cards}</div>`;
+  el.querySelectorAll('.dex-card').forEach(c=> c.addEventListener('click', ()=> openDexDetail(c.dataset.sp)));
+}
+function openDexDetail(spId){
+  const sp = getSpeciesById(spId);
+  const entry = state.captures[spId];
+  const caught = !!entry;
+  const stageIdx = caught? Math.min(entry.stage, sp.stages.length-1): 0;
+  const stage = sp.stages[stageIdx];
+  const canEvolve = caught && stage.need!=null && entry.candy>=stage.need;
+  const nextStage = caught && stage.need!=null ? sp.stages[stageIdx+1] : null;
+  const shinyOn = caught && isShinyActive(sp.shiny);
+  const root = document.getElementById('modalRoot');
+  root.innerHTML = `<div class="sheet-backdrop" id="sheetBackdrop"><div class="sheet">
+    <div class="sheet-handle"></div>
+    <div style="display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;">
+      <span class="rarity-tag ${sp.rarity}">${RARITY_LABEL[sp.rarity]}</span>
+      ${shinyOn?`<span class="tag-shiny">✨ ${escapeHtml(sp.shiny.label||'Shiny')}</span>`:''}
+      <div class="icon-wrap" style="--rarity:${shinyOn?(sp.shiny.color||'#d9a441'):`var(--rarity-${sp.rarity})`}; width:80px;height:80px;${caught?'':'filter:grayscale(1) opacity(.5);'}">${icon(sp.icon,'style="width:38px;height:38px;"')}</div>
+      <h2 class="capture-name">${caught? escapeHtml(stage.name) : '???'}</h2>
+      <p class="capture-hint" style="max-width:320px;">${caught? escapeHtml(stage.desc) : "Pas encore rencontré. Explorez la carte pour le trouver."}</p>
+      ${caught? `<p class="capture-hint">Tampons : <strong style="color:var(--ink);">${entry.candy}</strong>${stage.need!=null?` / ${stage.need} pour évoluer`:''}</p>`:''}
+      ${nextStage? `<button class="btn ${canEvolve?'btn-gold':'btn-ghost'}" id="evolveBtn" ${canEvolve?'':'disabled'} style="margin-top:8px;">Faire évoluer${canEvolve?` → ${escapeHtml(nextStage.name)}`:''}</button>`:''}
+      <button class="btn btn-ghost" id="closeSheetBtn" style="margin-top:8px;">Fermer</button>
+    </div>
+  </div></div>`;
+  document.getElementById('sheetBackdrop').addEventListener('click', e=>{ if(e.target.id==='sheetBackdrop') closeSheet(); });
+  document.getElementById('closeSheetBtn').onclick = closeSheet;
+  const evBtn = document.getElementById('evolveBtn');
+  if(evBtn) evBtn.onclick = ()=>{
+    entry.candy -= stage.need;
+    entry.stage = stageIdx+1;
+    saveLocal(); renderStatusBar();
+    closeSheet(); renderDex();
+    showToast(`${stage.name} a évolué en ${nextStage.name} !`);
+  };
+}
+function closeSheet(){ document.getElementById('modalRoot').innerHTML=''; }
+
+/* ============================= EVENTS SCREEN ============================= */
+function renderEvents(){
+  const el = document.getElementById('eventsScreen');
+  const now = new Date();
+  if(!ACTIVE_EVENTS.length){
+    el.innerHTML = `<h1>Évènements</h1><p class="sub">Actualité de PokeNevers</p><div class="info-note">Aucun évènement programmé pour le moment.</div>`;
+    return;
+  }
+  const cards = ACTIVE_EVENTS.slice().sort((a,b)=>a.start-b.start).map(ev=>{
+    const live = now>=ev.start && now<=ev.end;
+    const upcoming = now<ev.start;
+    const cd = live? fmtCountdown(ev.end) : (upcoming? fmtCountdown(ev.start): null);
+    const tagLabel = live? 'En cours' : (upcoming? 'À venir' : 'Terminé');
+    const tagClass = live? 'live' : (upcoming? 'upcoming':'');
+    return `<div class="event-card ${live?'live':''}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
+        <div style="display:flex;gap:10px;align-items:center;">
+          <div class="icon-wrap" style="width:44px;height:44px;--rarity:var(--gold);">${icon(ev.icon,'style="width:20px;height:20px;"')}</div>
+          <div><strong style="font-family:'Fredoka';font-size:15px;">${escapeHtml(ev.name)}</strong>
+          <div style="font-size:11px;color:var(--ink-faint);font-weight:700;">${ev.start.toLocaleDateString('fr-FR',{day:'numeric',month:'short'})} – ${ev.end.toLocaleDateString('fr-FR',{day:'numeric',month:'short'})}</div></div>
+        </div>
+        <span class="event-tag ${tagClass}">${tagLabel}</span>
+      </div>
+      <p style="font-size:13px;color:var(--ink-soft);margin:10px 0 6px 0;">${escapeHtml(ev.desc)}</p>
+      ${ev.bonus?`<p style="font-size:12px;font-weight:800;color:var(--gold-dark);margin:0;">${escapeHtml(ev.bonus)}</p>`:''}
+      ${cd? `<p style="font-size:11px;color:var(--ink-faint);font-weight:700;margin:6px 0 0 0;">${live?'Se termine dans':'Débute dans'} ${cd}</p>`:''}
+    </div>`;
+  }).join('');
+  el.innerHTML = `<h1>Évènements</h1><p class="sub">Actualité de PokeNevers</p>${cards}`;
+}
+
+/* ============================= PROFILE SCREEN ============================= */
+const BADGES = [
+  {id:'first', icon:'star', label:'Première capture', test:s=>Object.keys(s.captures).length>=1},
+  {id:'five', icon:'trophy', label:'5 commerçants', test:s=>Object.keys(s.captures).length>=5},
+  {id:'all', icon:'compass', label:'Collection complète', test:s=>ACTIVE_MERCHANTS.length>0 && Object.keys(s.captures).length>=ACTIVE_MERCHANTS.length},
+  {id:'legend', icon:'vase', label:'Trouver le Faïencier', test:s=>!!s.captures['faiencerie']},
+];
+
+/* ============================= DONNÉES DU PANEL ADMIN (gamedata.json) ============================= */
+// Si gamedata.json existe et contient des commerçants placés, le jeu bascule sur les vraies données ;
+// sinon il continue de fonctionner avec les commerçants fictifs de démonstration ci-dessus.
+let gameData = null;
+let usingLiveMerchants = false;
+let ACTIVE_MERCHANTS = SPECIES;
+let ACTIVE_POIS = POI_DEFS;
+let ACTIVE_EVENTS = EVENTS;
+let ACTIVE_MISSIONS = [];
+let ACTIVE_BADGES = BADGES;
+
+async function loadGameData(){
+  try{
+    const res = await fetch('./gamedata.json', {cache:'no-store'});
+    if(!res.ok) return;
+    const json = await res.json();
+    if(json && typeof json==='object') gameData = json;
+  }catch(e){ /* pas de fichier ou hors-ligne : on reste sur les données de démonstration */ }
+}
+function applyGameData(){
+  if(!gameData) return;
+  const liveMerchants = (gameData.merchants||[]).filter(m=> m.active!==false && m.lat!=null && m.lon!=null);
+  if(liveMerchants.length){
+    usingLiveMerchants = true;
+    ACTIVE_MERCHANTS = liveMerchants.map(m=>({
+      id:m.id, icon:m.icon||'basket', rarity:m.rarity||'commun', name:m.name||'Commerçant',
+      category:m.category||'', description:m.description||'', image:m.image||null,
+      lat:m.lat, lon:m.lon, shiny:m.shiny||null,
+      stages:(m.stages&&m.stages.length)? m.stages.map(s=>({name:s.name||m.name||'Stade', desc:s.desc||'', need:s.need!=null?s.need:null}))
+                                         : [{name:m.name||'Commerçant', desc:m.description||'', need:null}]
+    }));
+  }
+  const livePois = (gameData.pois||[]).filter(p=> p.active!==false && p.lat!=null && p.lon!=null);
+  if(livePois.length){
+    ACTIVE_POIS = livePois.map(p=>({
+      name:p.name||"Point d'intérêt", icon:p.icon||'stall', lat:p.lat, lon:p.lon,
+      rewardCoinsMin: p.rewardCoinsMin!=null?p.rewardCoinsMin:2,
+      rewardCoinsMax: p.rewardCoinsMax!=null?p.rewardCoinsMax:4,
+      rewardXp: p.rewardXp!=null?p.rewardXp:15
+    }));
+  }
+  const liveEvents = (gameData.events||[]).filter(ev=> ev.active!==false && ev.start && ev.end);
+  if(liveEvents.length){
+    ACTIVE_EVENTS = liveEvents.map(ev=>({
+      id:ev.id, name:ev.name||'Évènement', icon:ev.icon||'star',
+      start:new Date(ev.start), end:new Date(ev.end),
+      desc:ev.description||'', bonus:ev.bonusLabel||'', bonusType:ev.bonusType||'none', bonusSpeciesId:ev.bonusSpeciesId||''
+    }));
+  }
+  ACTIVE_MISSIONS = (gameData.missions||[]).filter(mi=> mi.active!==false);
+  const liveBadges = (gameData.badges||[]).filter(b=> b.active!==false);
+  if(liveBadges.length){
+    ACTIVE_BADGES = liveBadges.map(b=>({
+      id:b.id, icon:b.icon||'medal', label:b.label||'Badge',
+      test:(s)=>{
+        if(b.criteriaType==='captures_count') return Object.keys(s.captures).length >= (b.criteriaValue||1);
+        if(b.criteriaType==='species_captured') return !!s.captures[b.criteriaValue];
+        if(b.criteriaType==='all_captured') return ACTIVE_MERCHANTS.length>0 && Object.keys(s.captures).length >= ACTIVE_MERCHANTS.length;
+        if(b.criteriaType==='mission_completed') return !!(s.missionsCompleted && s.missionsCompleted[b.criteriaValue]);
+        return false;
+      }
+    }));
+  }
+}
+
+/* ============================= MISSIONS ============================= */
+function missionProgress(mi){
+  if(mi.type==='capture_count') return Object.keys(state.captures).length;
+  if(mi.type==='poi_spin_count') return state.totalPoiSpins||0;
+  if(mi.type==='catch_species') return state.captures[mi.targetSpeciesId] ? 1 : 0;
+  if(mi.type==='catch_rarity') return Object.keys(state.captures).some(id=>{ const sp=getSpeciesById(id); return sp && sp.rarity===mi.targetRarity; }) ? 1 : 0;
+  return 0;
+}
+function missionTarget(mi){
+  if(mi.type==='capture_count' || mi.type==='poi_spin_count') return mi.target||1;
+  return 1;
+}
+function checkMissions(){
+  if(!ACTIVE_MISSIONS.length) return;
+  let changed = false;
+  ACTIVE_MISSIONS.forEach(mi=>{
+    if(state.missionsCompleted[mi.id]) return;
+    if(missionProgress(mi) >= missionTarget(mi)){
+      state.missionsCompleted[mi.id] = true;
+      state.xp += mi.rewardXp||0;
+      state.coins += mi.rewardCoins||0;
+      changed = true;
+      showToast(`Mission accomplie : ${mi.title}${mi.rewardXp?` (+${mi.rewardXp} XP)`:''}`);
+    }
+  });
+  if(changed){ saveLocal(); renderStatusBar(); }
+}
+function renderMissions(){
+  const el = document.getElementById('missionsScreen');
+  if(!ACTIVE_MISSIONS.length){
+    el.innerHTML = `<h1>Missions</h1><p class="sub">Objectifs à accomplir en ville</p><div class="info-note">Aucune mission n'est configurée pour le moment.</div>`;
+    return;
+  }
+  const cards = ACTIVE_MISSIONS.map(mi=>{
+    const done = !!state.missionsCompleted[mi.id];
+    const progress = Math.min(missionProgress(mi), missionTarget(mi));
+    const target = missionTarget(mi);
+    const pct = Math.max(0, Math.min(100, Math.round(progress/target*100)));
+    const badge = mi.rewardBadgeId ? ACTIVE_BADGES.find(b=>b.id===mi.rewardBadgeId) : null;
+    return `<div class="event-card ${done?'live':''}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
+        <div style="display:flex;gap:10px;align-items:center;">
+          <div class="icon-wrap" style="width:44px;height:44px;--rarity:var(--blue-600);">${icon('flag','style="width:20px;height:20px;"')}</div>
+          <strong style="font-family:'Fredoka';font-size:15px;">${escapeHtml(mi.title)}</strong>
+        </div>
+        <span class="event-tag ${done?'live':''}">${done?'Terminée':'En cours'}</span>
+      </div>
+      <p style="font-size:13px;color:var(--ink-soft);margin:10px 0 6px 0;">${escapeHtml(mi.description||'')}</p>
+      <div class="mission-progress"><i style="width:${pct}%;background:${done?'var(--green)':'var(--blue-600)'};"></i></div>
+      <p style="font-size:11px;color:var(--ink-faint);font-weight:700;margin:6px 0 0 0;">${progress} / ${target}${badge?' · Badge : '+escapeHtml(badge.label):''}</p>
+      <p style="font-size:12px;font-weight:800;color:var(--gold-dark);margin:6px 0 0 0;">+${mi.rewardXp||0} XP · +${mi.rewardCoins||0} tampons</p>
+    </div>`;
+  }).join('');
+  el.innerHTML = `<h1>Missions</h1><p class="sub">Objectifs à accomplir en ville</p>${cards}`;
+}
+
+function renderProfile(){
+  const el = document.getElementById('profileScreen');
+  const lvl = levelFromXp(state.xp);
+  const totalCaught = Object.keys(state.captures).length;
+  const totalEvolved = Object.values(state.captures).filter(c=>c.stage>0).length;
+  const badgeHtml = ACTIVE_BADGES.map(b=>{
+    const earned = b.test(state);
+    return `<div class="badge-item ${earned?'earned':''}"><div class="badge-circle-lg">${icon(b.icon,'style="'+ (earned?'':'stroke:var(--ink-faint)')+'"')}</div><span>${escapeHtml(b.label)}</span></div>`;
+  }).join('');
+  el.innerHTML = `<h1>${escapeHtml(state.trainerName||'Dresseur')}</h1><p class="sub">Niveau ${lvl} · Nevers</p>
+    <div style="background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-md);padding:4px 16px;box-shadow:var(--shadow-sm);">
+      <div class="profile-stat"><span>Commerçants découverts</span><strong>${totalCaught} / ${ACTIVE_MERCHANTS.length}</strong></div>
+      <div class="profile-stat"><span>Évolutions réalisées</span><strong>${totalEvolved}</strong></div>
+      <div class="profile-stat"><span>XP total</span><strong>${state.xp}</strong></div>
+      <div class="profile-stat"><span>Tampons en poche</span><strong>${state.coins}</strong></div>
+    </div>
+    <h2 style="font-size:16px;margin:22px 0 0 0;">Badges</h2>
+    <div class="badge-grid">${badgeHtml}</div>
+    <div class="info-note">${usingLiveMerchants ? "Vrais commerçants de Nevers, vraie carte OpenStreetMap et vrai GPS. Progression enregistrée sur cet appareil uniquement pour l'instant." : "Version prototype : commerçants fictifs, mais vraie carte OpenStreetMap et vrai GPS. Progression enregistrée sur cet appareil uniquement pour l'instant. Un panel d'administration permet d'ajouter les vrais commerçants, POI et évènements."}</div>
+    <button class="btn btn-ghost" id="resetBtn" style="margin-top:16px;">Réinitialiser ma progression</button>`;
+  document.getElementById('resetBtn').onclick = ()=>{
+    if(confirm('Réinitialiser toute la progression ?')){
+      const name = state.trainerName;
+      const spawns = state.spawns;
+      state = defaultState(); state.trainerName=name; state.seenIntro=true; state.spawns=spawns;
+      saveLocal(); renderAll();
+    }
+  };
+}
+
+/* ============================= NAV ============================= */
+const TABS = [
+  {id:'map', label:'Carte', icon:'map'},
+  {id:'dex', label:'Commerçants', icon:'basket'},
+  {id:'events', label:'Évènements', icon:'star'},
+  {id:'missions', label:'Missions', icon:'flag'},
+  {id:'profile', label:'Profil', icon:'person'},
+];
+let activeView='map';
+function renderTabbar(){
+  const bar = document.getElementById('tabbar');
+  bar.innerHTML = TABS.map(t=>`<button class="tab ${activeView===t.id?'active':''}" data-tab="${t.id}">
+    ${icon(t.icon)}<span>${t.label}</span><span class="dot-ind"></span></button>`).join('');
+  bar.querySelectorAll('.tab').forEach(b=> b.addEventListener('click', ()=> switchView(b.dataset.tab)));
+}
+function switchView(v){
+  activeView=v;
+  document.getElementById('mapView').style.display = v==='map'?'block':'none';
+  document.getElementById('dexScreen').style.display = v==='dex'?'block':'none';
+  document.getElementById('eventsScreen').style.display = v==='events'?'block':'none';
+  document.getElementById('missionsScreen').style.display = v==='missions'?'block':'none';
+  document.getElementById('profileScreen').style.display = v==='profile'?'block':'none';
+  if(v==='dex') renderDex();
+  if(v==='events') renderEvents();
+  if(v==='missions') renderMissions();
+  if(v==='profile') renderProfile();
+  renderTabbar();
+  if(v==='map' && map) setTimeout(()=> map.invalidateSize(), 60);
+}
+function renderAll(){
+  renderStatusBar();
+  renderTabbar();
+  switchView(activeView);
+}
+
+/* ============================= ONBOARDING ============================= */
+function showOnboarding(){
+  const root = document.getElementById('modalRoot');
+  root.innerHTML = `<div id="onboardBackdrop"><div class="onboard-card">
+    <p class="onboard-logo">Poke<span class="accent">Nevers</span></p>
+    <p class="onboard-tag">Capturez les commerçants de votre ville</p>
+    <p style="font-size:13px;color:var(--ink-soft);font-weight:700;margin:0 0 16px 0;">Choisissez votre nom de dresseur. La page va ensuite vous demander l'accès à votre position — acceptez pour jouer avec le vrai GPS.</p>
+    <input class="text-input" id="nameInput" placeholder="Votre prénom" maxlength="18" autofocus>
+    <button class="btn btn-primary" id="startBtn" style="margin-top:14px;">Commencer l'aventure</button>
+  </div></div>`;
+  const input = document.getElementById('nameInput');
+  const go = ()=>{
+    const val = input.value.trim();
+    state.trainerName = val || 'Dresseur';
+    state.seenIntro = true;
+    saveLocal();
+    document.getElementById('modalRoot').innerHTML='';
+    startGeo();
+  };
+  document.getElementById('startBtn').onclick = go;
+  input.addEventListener('keydown', e=>{ if(e.key==='Enter') go(); });
+}
+
+/* ============================= BOOT ============================= */
+async function boot(){
+  const saved = loadLocal();
+  state = Object.assign(defaultState(), saved||{});
+  // Complète les sauvegardes existantes créées avant l'ajout des missions/cooldowns.
+  state.captures = state.captures || {};
+  state.poiSpins = state.poiSpins || {};
+  state.totalPoiSpins = state.totalPoiSpins || 0;
+  state.captureCooldowns = state.captureCooldowns || {};
+  state.missionsCompleted = state.missionsCompleted || {};
+  await loadGameData();
+  applyGameData();
+  initMap();
+  renderAll();
+  document.getElementById('geoRetryBtn').onclick = startGeo;
+  if(state.seenIntro){ startGeo(); }
+  else { showOnboarding(); }
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.register('sw.js').catch(()=>{});
+  }
+}
+document.addEventListener('DOMContentLoaded', boot);
+
+})();
+</script>
+</body>
+</html>

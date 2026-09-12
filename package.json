@@ -2,8 +2,8 @@
   "name": "pokenevers-web",
   "private": true,
   "version": "1.0.0",
-  "description": "PokeNevers - jeu + panneau admin statiques, avec fonctions Netlify pour le déploiement du contenu.",
-  "dependencies": {
-    "@netlify/blobs": "^8.1.0"
+  "description": "PokeNevers - jeu + panneau admin statiques, avec un Worker Cloudflare pour le déploiement du contenu.",
+  "devDependencies": {
+    "wrangler": "^4"
   }
 }

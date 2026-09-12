@@ -1,0 +1,30 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "pokenevers-web",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-09-11",
+
+  // Fichiers statiques du jeu et de l'admin (voir DEPLOIEMENT.md).
+  // "run_worker_first" liste les seules routes qui doivent exécuter le
+  // Worker (src/worker.js) : tout le reste est servi directement comme
+  // fichier statique, sans jamais lancer de code — c'est ce qui évite le
+  // souci rencontré au premier essai (le dossier entier, y compris
+  // node_modules créé pendant le build, avait été traité comme un bloc
+  // unique de fichiers à publier).
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": ["/gamedata.json", "/deploy-gamedata", "/verify-password"]
+  },
+
+  // À COMPLÉTER : remplacez "REMPLACER_PAR_ID_NAMESPACE_KV" par l'ID réel du
+  // namespace KV créé sur Cloudflare (voir DEPLOIEMENT.md, étape 5). Le nom
+  // de la liaison ("POKENEVERS_KV") doit rester exactement celui-ci, c'est
+  // celui utilisé dans le code (src/lib/kv-store.js).
+  "kv_namespaces": [
+    {
+      "binding": "POKENEVERS_KV",
+      "id": "REMPLACER_PAR_ID_NAMESPACE_KV"
+    }
+  ]
+}

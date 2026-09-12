@@ -1,114 +1,122 @@
-# Déployer les changements en un clic — mode d'emploi (Cloudflare Pages)
+# Déployer les changements en un clic — mode d'emploi (Cloudflare)
 
 Cette mise à jour ajoute un bouton **« Déployer sur le jeu »** dans `admin.html` :
 en un clic, vos modifications (commerçants, POI, évènements, missions, badges)
 sont publiées pour tous les joueurs, sans avoir à exporter/réimporter un fichier
 à la main.
 
-Techniquement, ça repose sur trois petites fonctions serveur (dossier
-`functions/`) et sur **Cloudflare Workers KV** (un espace de stockage clé/valeur
-fourni gratuitement par Cloudflare) pour garder la dernière version publiée.
+> **Changement important par rapport à la version précédente de ce guide** :
+> le premier essai sur Cloudflare a échoué avec l'erreur *"Asset too large"*
+> (148 Mo) — la faute à la structure du projet, pas à vous. En creusant, il
+> s'est avéré que Cloudflare a fusionné son ancien produit « Pages » dans un
+> nouveau modèle unifié **« Workers avec fichiers statiques »**, différent de
+> ce que documentait l'ancienne version de ce guide. Le dossier a été
+> réorganisé en conséquence (voir plus bas) : ça ne change rien à l'usage
+> quotidien, juste à la structure des fichiers et à la procédure de mise en
+> route, à refaire une fois.
+
+Le projet est maintenant organisé ainsi :
+- `public/` : tous les fichiers du site tels que le navigateur les reçoit
+  (`index.html`, `admin.html`, `manifest.json`, `sw.js`, les icônes).
+- `src/worker.js` : un unique petit programme serveur qui gère les 3 actions
+  qui ont besoin de code (récupérer les données du jeu, vérifier le mot de
+  passe, déployer une mise à jour) — tout le reste est servi directement
+  comme fichier statique, sans passer par ce programme.
+- `wrangler.jsonc` : le fichier de configuration qui indique à Cloudflare où
+  sont les fichiers statiques, quel est le programme serveur, et à quel
+  espace de stockage (KV) se connecter.
+
 Le mot de passe qui protège le déploiement n'est **jamais** présent dans le
-code du site : il vit uniquement dans une variable d'environnement sur
-Cloudflare.
-
-> **Pourquoi Cloudflare et pas Netlify ?** Le projet a d'abord été mis en
-> route sur Netlify, mais son compte gratuit s'est retrouvé bloqué par un
-> système de « crédits opérationnels » qui met en pause les déploiements
-> (souci assez répandu sur les comptes gratuits Netlify courant 2026).
-> Cloudflare Pages a un plan gratuit sans ce genre de blocage : 100 000
-> requêtes/jour et 1000 écritures KV/jour offertes, largement suffisant pour
-> ce projet, sans risque de facturation surprise puisqu'aucune carte
-> bancaire n'est même demandée à l'inscription.
-
-Ce projet ne nécessite **aucune dépendance npm** (contrairement à la version
-Netlify) : pas de `package.json`, pas d'installation à faire, juste les
-fichiers du dossier tels quels.
+code du site : il vit uniquement dans une variable chiffrée sur Cloudflare.
 
 ## Étape 1 — Créer un compte Cloudflare (gratuit)
 
-Si vous n'en avez pas : https://dash.cloudflare.com/sign-up — aucune carte
-bancaire n'est demandée pour le plan gratuit utilisé ici.
+Si ce n'est pas déjà fait : https://dash.cloudflare.com/sign-up — aucune
+carte bancaire n'est demandée pour le plan gratuit utilisé ici.
 
-## Étape 2 — Déposer le projet sur GitHub
+## Étape 2 — Créer l'espace de stockage KV (avant tout le reste)
+
+C'est l'endroit où sont enregistrées les données publiées par le bouton
+« Déployer ». Il faut le créer en premier car son identifiant doit être écrit
+dans un fichier du projet avant de le déposer sur GitHub.
+
+1. Sur le tableau de bord Cloudflare : menu de gauche **Storage & Databases**
+   → **KV** → **Create namespace** (ou **Create a namespace**).
+2. Donnez-lui un nom, par exemple `pokenevers-kv`, puis validez.
+3. Une fois créé, cliquez dessus : notez l'**ID du namespace** affiché (une
+   longue suite de lettres/chiffres, ex. `a1b2c3d4e5f6...`).
+
+## Étape 3 — Compléter `wrangler.jsonc`
+
+Dans le dossier du projet, ouvrez `wrangler.jsonc` et remplacez
+`REMPLACER_PAR_ID_NAMESPACE_KV` par l'ID noté à l'étape 2 :
+
+```jsonc
+"kv_namespaces": [
+  {
+    "binding": "POKENEVERS_KV",
+    "id": "COLLEZ_ICI_L_ID_DE_VOTRE_NAMESPACE"
+  }
+]
+```
+
+Enregistrez le fichier.
+
+## Étape 4 — Déposer le projet sur GitHub
 
 1. Créez un compte gratuit sur https://github.com si vous n'en avez pas.
-2. Créez un nouveau dépôt (repository), par exemple `pokenevers-web`.
-3. Déposez-y **le contenu** de ce dossier (via « Add file » → « Upload files »
-   sur GitHub — glissez tous les fichiers et dossiers **à l'intérieur** du
-   dossier, pas le dossier lui-même, sinon tout se retrouve imbriqué dans un
-   sous-dossier en trop et Cloudflare ne trouve plus les fichiers).
+2. Créez un nouveau dépôt (repository), par exemple `pokenevers-web` (ou
+   réutilisez le dépôt existant si vous aviez déjà tenté l'étape Netlify —
+   dans ce cas, supprimez d'abord tous les anciens fichiers du dépôt, la
+   structure a changé).
+3. Déposez-y **le contenu** de ce dossier — `public/`, `src/`,
+   `wrangler.jsonc`, `package.json`, `DEPLOIEMENT.md` — en glissant tout ça
+   **à l'intérieur** du dépôt via « Add file » → « Upload files » (glissez le
+   contenu du dossier, pas le dossier lui-même, sinon tout se retrouve
+   imbriqué dans un sous-dossier en trop).
 
-## Étape 3 — Créer le projet Cloudflare Pages
+## Étape 5 — Créer le Worker et le relier au dépôt
 
-1. Sur le tableau de bord Cloudflare : menu de gauche **Workers & Pages** →
-   **Create application** → onglet **Pages** → **Connect to Git**.
-2. Choisissez votre dépôt GitHub (`pokenevers-web`), autorisez l'accès si
-   demandé.
-3. Réglages de build :
-   - **Framework preset** : `None`
-   - **Build command** : laissez vide
-   - **Build output directory** : `/` (la racine — c'est un site statique,
-     aucune étape de build n'est nécessaire)
-4. Cliquez sur **Save and Deploy**. Au bout de quelques secondes, votre site
-   est en ligne sur une adresse du type `pokenevers-web.pages.dev`.
+1. Sur le tableau de bord Cloudflare : menu de gauche **Compute (Workers)** →
+   **Workers & Pages** → **Create application** (ou **Create Worker**).
+2. Choisissez l'option de déploiement **depuis un dépôt Git** / **Connect to
+   Git** (le libellé exact peut varier selon les mises à jour de
+   l'interface), puis sélectionnez votre dépôt GitHub.
+3. Cloudflare doit détecter automatiquement `wrangler.jsonc` à la racine du
+   dépôt et l'utiliser pour la configuration (nom du Worker, fichiers
+   statiques, liaison KV) — vous n'avez rien d'autre à remplir à cette étape.
+4. Lancez le déploiement.
 
-À ce stade, le jeu (`index.html`) et l'admin (`admin.html`) sont déjà en
-ligne, mais le mot de passe et le bouton « Déployer » ne fonctionnent pas
-encore — il manque les deux réglages ci-dessous.
+Si l'interface vous propose de choisir entre « Workers » et « Pages » à un
+moment donné : choisissez **Workers** (Pages a été fusionné dedans dans le
+nouveau modèle utilisé ici).
 
-## Étape 4 — Définir le mot de passe (variable d'environnement)
+## Étape 6 — Définir le mot de passe (variable chiffrée)
 
-1. Dans votre projet Pages : **Settings → Environment variables**.
-2. **Add variable** : nom `ADMIN_PASSWORD`, valeur : le mot de passe de votre
-   choix (gardez-le pour vous, c'est lui qui protège l'admin et le
-   déploiement). Cochez bien l'environnement **Production** (et Preview si
-   vous voulez aussi tester sur les déploiements de prévisualisation).
+1. Une fois le Worker créé : allez dans son onglet **Settings** →
+   **Variables and Secrets** (le nom exact peut varier légèrement).
+2. **Add** : nom `ADMIN_PASSWORD`, valeur : le mot de passe de votre choix —
+   cochez/choisissez le type **Secret** (chiffré) plutôt que texte brut.
 3. Enregistrez.
+
+Cette variable est indépendante du fichier `wrangler.jsonc` : elle survit aux
+prochains déploiements sans qu'il soit nécessaire de la redéfinir à chaque
+fois.
 
 Tant que cette variable n'est pas définie, `admin.html` reste accessible sans
 mot de passe (un bandeau orange vous le rappelle), et le bouton « Déployer »
 répond avec un message d'erreur clair plutôt que d'échouer silencieusement.
 
-## Étape 5 — Créer et relier l'espace de stockage Workers KV
-
-C'est l'endroit où sont enregistrées les données publiées par le bouton
-« Déployer ».
-
-1. Sur le tableau de bord Cloudflare : **Workers & Pages** → onglet
-   **KV** (dans le menu de gauche, sous « Storage & Databases ») → **Create
-   namespace**.
-2. Donnez-lui un nom, par exemple `pokenevers-kv`, puis **Add**.
-3. Retournez dans votre projet Pages → **Settings → Functions** → section
-   **KV namespace bindings** → **Add binding**.
-4. Renseignez :
-   - **Variable name** : `POKENEVERS_KV` **(exactement ce nom, en
-     majuscules)** — c'est le nom que le code utilise pour retrouver le
-     stockage.
-   - **KV namespace** : sélectionnez `pokenevers-kv` (créé à l'étape 2).
-5. Enregistrez.
-
-## Étape 6 — Redéployer pour appliquer les réglages
-
-Les variables d'environnement et les liaisons KV ne s'appliquent qu'aux
-**nouveaux** déploiements, pas à ceux déjà en ligne :
-
-1. Onglet **Deployments** de votre projet Pages.
-2. Sur le dernier déploiement : menu **⋯** → **Retry deployment** (ou faites
-   n'importe quel petit changement dans le dépôt GitHub, ce qui déclenche
-   automatiquement un nouveau déploiement).
-3. Attendez le statut **Success**.
-
 ## Étape 7 — Tester
 
-1. Ouvrez `admin.html` sur votre site (`https://<votre-projet>.pages.dev/admin.html`) :
+1. Ouvrez `admin.html` sur l'adresse de votre Worker (affichée sur sa page
+   Cloudflare, du type `https://pokenevers-web.<vous>.workers.dev/admin.html`) :
    une page de connexion doit apparaître. Entrez le mot de passe défini à
-   l'étape 4.
+   l'étape 6.
 2. Modifiez un commerçant, cliquez sur **« Déployer sur le jeu »**.
 3. Ouvrez `index.html` (ou rafraîchissez-le) : le changement doit apparaître.
 4. Le bouton **« Récupérer la version en ligne »** recharge dans l'admin la
-   version actuellement publiée (utile si vous rouvrez l'admin sur un autre
-   appareil, ou après avoir vidé le cache de votre navigateur).
+   version actuellement publiée.
 
 Comme précédemment, cette partie ne peut pas être testée depuis mon
 environnement (pas d'accès à Cloudflare) : merci de faire ce test réel et de
@@ -120,16 +128,16 @@ d'erreur exact, capture d'écran si possible).
 - **Contenu du jeu** (commerçants, POI, évènements, missions, badges) : tout
   se fait depuis `admin.html` via « Déployer sur le jeu », plus besoin de
   repasser par GitHub/Cloudflare.
-- **Code du site** (`index.html`, `admin.html`, fonctions serveur) : mettez à
-  jour les fichiers directement dans le dépôt GitHub (via l'interface web, en
-  écrasant les fichiers existants) ; Cloudflare Pages redéploie
-  automatiquement à chaque mise à jour du dépôt.
+- **Code du site** (`public/index.html`, `public/admin.html`,
+  `src/worker.js`) : mettez à jour les fichiers directement dans le dépôt
+  GitHub (via l'interface web, en écrasant les fichiers existants) ;
+  Cloudflare redéploie automatiquement à chaque mise à jour du dépôt.
 
 ## Domaine personnalisé (optionnel)
 
-Si vous voulez une adresse plus mémorable que `*.pages.dev`, Cloudflare Pages
-permet de relier un nom de domaine que vous possédez déjà, gratuitement
-(**Custom domains** dans les réglages du projet).
+Cloudflare permet de relier gratuitement un nom de domaine que vous possédez
+déjà, à la place de l'adresse `*.workers.dev` (onglet **Domains & Routes** du
+Worker, ou **Triggers**).
 
 ## En secours
 
@@ -140,8 +148,8 @@ l'admin, continuer à travailler dessus, puis la réimporter plus tard (via
 « Importer un gamedata.json ») pour la publier dès que le déploiement en un
 clic fonctionne de nouveau.
 
-Note technique : contrairement à la version Netlify, déposer manuellement un
-fichier `gamedata.json` sur GitHub n'a ici aucun effet sur le jeu en ligne —
-la fonction `/gamedata.json` répond toujours en priorité (elle lit Workers
-KV, ou les données de démo si KV n'est pas configuré), quel que soit le
-contenu d'un éventuel fichier statique du même nom dans le dépôt.
+Note technique : déposer manuellement un fichier `gamedata.json` dans
+`public/` sur GitHub n'a ici aucun effet sur le jeu en ligne — la route
+`/gamedata.json` est toujours interceptée en priorité par `src/worker.js`
+(qui lit Workers KV, ou les données de démo si KV n'est pas configuré),
+quel que soit le contenu du fichier statique du même nom.
