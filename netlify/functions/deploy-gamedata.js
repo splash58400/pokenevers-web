@@ -11,7 +11,7 @@
 // de l'admin qui le saisit.
 "use strict";
 
-const { getStore } = require("@netlify/blobs");
+const { getConfiguredStore } = require("./blob-store");
 
 const STORE_NAME = "pokenevers";
 const BLOB_KEY = "gamedata";
@@ -63,7 +63,7 @@ exports.handler = async function handler(event) {
   if (gamedata.version == null) gamedata.version = 1;
 
   try {
-    const store = getStore(STORE_NAME);
+    const store = getConfiguredStore(STORE_NAME);
     await store.setJSON(BLOB_KEY, gamedata);
   } catch (err) {
     return {

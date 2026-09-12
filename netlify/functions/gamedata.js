@@ -7,7 +7,7 @@
 //    démonstration livré avec le site, pour que le jeu ne soit jamais cassé.
 "use strict";
 
-const { getStore } = require("@netlify/blobs");
+const { getConfiguredStore } = require("./blob-store");
 const seedData = require("../../gamedata.json");
 
 const STORE_NAME = "pokenevers";
@@ -20,7 +20,7 @@ exports.handler = async function handler(event) {
 
   let payload = seedData;
   try {
-    const store = getStore(STORE_NAME);
+    const store = getConfiguredStore(STORE_NAME);
     const current = await store.get(BLOB_KEY, { type: "json" });
     if (current && typeof current === "object") {
       payload = current;
