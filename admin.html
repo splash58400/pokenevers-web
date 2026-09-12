@@ -927,7 +927,7 @@ async function deployToGame(){
   btn.disabled = true; btn.classList.add('is-busy'); btn.textContent = 'Déploiement…';
   try{
     const clean = JSON.parse(JSON.stringify(data));
-    const res = await fetch('/.netlify/functions/deploy-gamedata', {
+    const res = await fetch('/deploy-gamedata', {
       method:'POST',
       headers:{'content-type':'application/json'},
       body: JSON.stringify({ password: pw, gamedata: clean })
@@ -943,7 +943,7 @@ async function deployToGame(){
       alert("Échec du déploiement : "+msg+"\n\nEn attendant, vous pouvez utiliser Exporter/Importer manuellement.");
     }
   }catch(e){
-    alert("Impossible de contacter le serveur de déploiement (fonctions Netlify non configurées, ou site en simple hébergement statique).\n\nUtilisez Exporter/Importer manuellement en attendant.\n\nDétail : "+e.message);
+    alert("Impossible de contacter le serveur de déploiement (fonctions serveur non configurées, ou site en simple hébergement statique).\n\nUtilisez Exporter/Importer manuellement en attendant.\n\nDétail : "+e.message);
   } finally {
     btn.disabled = false; btn.classList.remove('is-busy'); btn.textContent = label;
   }
@@ -954,15 +954,15 @@ async function deployToGame(){
 // navigateur) : c'est un simple filtre de confort qui vérifie le mot de passe
 // auprès de la fonction serveur verify-password.js, laquelle lit la même
 // variable d'environnement ADMIN_PASSWORD que le déploiement. Tant que cette
-// variable n'est pas configurée sur Netlify (ou que les fonctions ne sont pas
-// disponibles), l'accès à l'admin reste ouvert pour ne pas bloquer la mise en
-// route du projet.
+// variable n'est pas configurée sur l'hébergeur (ou que les fonctions ne sont
+// pas disponibles), l'accès à l'admin reste ouvert pour ne pas bloquer la
+// mise en route du projet.
 const SESSION_PW_KEY = 'pokenevers_admin_pw';
 const SESSION_AUTHED_KEY = 'pokenevers_admin_authed';
 
 async function checkPasswordWithServer(pw){
   try{
-    const res = await fetch('/.netlify/functions/verify-password', {
+    const res = await fetch('/verify-password', {
       method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({password: pw||''})
     });
     if(res.status===200) return 'ok';
@@ -975,7 +975,7 @@ async function checkPasswordWithServer(pw){
 function showGateWarning(kind){
   const el = document.getElementById('gateWarning');
   if(kind==='unconfigured'){
-    el.textContent = "⚠️ La variable ADMIN_PASSWORD n'est pas configurée sur Netlify : cette page admin n'est protégée par aucun mot de passe pour l'instant.";
+    el.textContent = "⚠️ La variable ADMIN_PASSWORD n'est pas configurée côté serveur : cette page admin n'est protégée par aucun mot de passe pour l'instant.";
     el.style.display='block';
   } else if(kind==='unavailable'){
     el.textContent = "⚠️ Les fonctions serveur ne sont pas disponibles ici (test local, ou hébergement statique simple) : mot de passe et déploiement en un clic désactivés. Utilisez Exporter/Importer.";
