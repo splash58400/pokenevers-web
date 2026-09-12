@@ -434,6 +434,13 @@ const RARITY_XP    = {commun:40, 'peu-commun':70, rare:120, legendaire:400};
 const RARITY_CANDY = {commun:3, 'peu-commun':3, rare:2, legendaire:1};
 const RARITY_ZONE  = {commun:.34, 'peu-commun':.26, rare:.19, legendaire:.13};
 const RARITY_ROUNDS = {commun:1, 'peu-commun':2, rare:3, legendaire:4};
+// Échouer une capture coûte de l'XP (plus la rareté est élevée, plus la perte est lourde — même
+// logique que le reste du jeu). À 0 XP, impossible de retenter une capture tant qu'on n'est pas
+// repassé par un point d'intérêt pour en regagner (voir onSpawnTap et spinPoi).
+const RARITY_XP_LOSS = {commun:10, 'peu-commun':18, rare:30, legendaire:60};
+// Un nouveau dresseur démarre avec un petit capital d'XP, pour ne pas se retrouver bloqué dès
+// la toute première capture (voir defaultState()).
+const STARTING_XP = 20;
 
 const SPECIES = [
   { id:'boulangerie', icon:'bread', rarity:'commun',
@@ -542,7 +549,7 @@ let state = null;
 function defaultState(){
   return {
     trainerName:null,
-    xp:0,
+    xp:STARTING_XP,
     coins:0,
     captures:{},
     poiSpins:{},
@@ -745,6 +752,7 @@ function onSpawnTap(sp){
   if(curLat===null){ showToast('En attente de votre position GPS...'); return; }
   const dist = map.distance([curLat,curLon],[sp.lat,sp.lon]);
   if(dist>RANGE_M){ showToast(`Trop loin (${fmtDist(dist)}) — rapprochez-vous à moins de ${RANGE_M} m.`); return; }
+  if(state.xp<=0){ showToast("Plus assez d'XP pour tenter une capture — direction un point d'intérêt pour vous refaire une santé !"); return; }
   if(usingLiveMerchants){
     const last = state.captureCooldowns[sp.speciesId]||0;
     const cooldownMs = 10*60*1000;
@@ -936,7 +944,12 @@ function doThrow(){
         document.getElementById('captureDoneBtn').onclick = closeCapture;
       }
     } else {
-      wrap.innerHTML = `<div class="capture-result fail">Il s'est échappé…</div><p class="capture-hint">Retentez votre chance sur un prochain passage.</p><button class="btn btn-ghost" id="captureDoneBtn" style="margin-top:10px;">Fermer</button>`;
+      const loss = Math.min(state.xp, RARITY_XP_LOSS[capture.species.rarity]);
+      state.xp = Math.max(0, state.xp - RARITY_XP_LOSS[capture.species.rarity]);
+      saveLocal();
+      renderStatusBar();
+      const outOfXp = state.xp<=0;
+      wrap.innerHTML = `<div class="capture-result fail">Il s'est échappé…</div><p class="capture-hint">${loss>0?`-${loss} XP · `:''}Retentez votre chance sur un prochain passage.</p>${outOfXp?`<p class="capture-hint" style="color:var(--brick-dark); font-weight:700;">Plus d'XP ! Direction un point d'intérêt pour vous refaire une santé.</p>`:''}<button class="btn btn-ghost" id="captureDoneBtn" style="margin-top:10px;">Fermer</button>`;
       document.getElementById('captureDoneBtn').onclick = closeCapture;
     }
   }, 380);
