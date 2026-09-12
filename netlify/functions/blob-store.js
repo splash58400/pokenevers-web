@@ -8,21 +8,25 @@
 // pourtant correct). On utilise donc le mode "manuel" recommandé par Netlify
 // en solution de repli : fournir explicitement siteID + token.
 //
-// - NETLIFY_SITE_ID est injecté automatiquement par Netlify dans toutes les
-//   fonctions (pas besoin de le configurer soi-même).
-// - NETLIFY_BLOBS_TOKEN doit être créé une fois par Jérémy : un "Personal
-//   access token" Netlify (User settings → Applications → New access token),
-//   ajouté comme variable d'environnement du site. Voir DEPLOIEMENT.md.
+// Contrairement à ce que suggère la documentation Netlify, NETLIFY_SITE_ID
+// n'est PAS toujours disponible automatiquement à l'intérieur d'une fonction
+// (confirmé en conditions réelles) : les deux valeurs sont donc fournies via
+// des variables d'environnement définies à la main sur Netlify.
+// - BLOBS_SITE_ID : le "Project ID" / "Site ID" visible dans
+//   Project configuration → General → Project information.
+// - NETLIFY_BLOBS_TOKEN : un "Personal access token" Netlify
+//   (User settings → Applications → New access token).
+// Voir DEPLOIEMENT.md pour la procédure complète.
 "use strict";
 
 const { getStore } = require("@netlify/blobs");
 
 function getConfigError() {
-  if (!process.env.NETLIFY_SITE_ID) {
-    return "NETLIFY_SITE_ID est absent (devrait normalement être fourni automatiquement par Netlify).";
+  if (!process.env.BLOBS_SITE_ID) {
+    return "La variable d'environnement BLOBS_SITE_ID n'est pas configurée sur Netlify (voir DEPLOIEMENT.md, étape Netlify Blobs).";
   }
   if (!process.env.NETLIFY_BLOBS_TOKEN) {
-    return "La variable d'environnement NETLIFY_BLOBS_TOKEN n'est pas configurée sur Netlify (voir DEPLOIEMENT.md, étape sur Netlify Blobs).";
+    return "La variable d'environnement NETLIFY_BLOBS_TOKEN n'est pas configurée sur Netlify (voir DEPLOIEMENT.md, étape Netlify Blobs).";
   }
   return null;
 }
@@ -31,7 +35,7 @@ function getConfiguredStore(name) {
   const err = getConfigError();
   if (err) throw new Error(err);
   return getStore(name, {
-    siteID: process.env.NETLIFY_SITE_ID,
+    siteID: process.env.BLOBS_SITE_ID,
     token: process.env.NETLIFY_BLOBS_TOKEN
   });
 }
