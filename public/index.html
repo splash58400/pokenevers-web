@@ -223,15 +223,21 @@ button{font-family:inherit;}
 .dex-card:active{transform:scale(.96);}
 .dex-card:not(.locked){box-shadow:var(--shadow-sm), inset 0 0 0 1px color-mix(in srgb, var(--rarity, var(--rarity-commun)) 18%, transparent);}
 .icon-wrap{
-  width:58px;height:58px;border-radius:50%; display:flex; align-items:center; justify-content:center;
+  width:58px;height:58px;border-radius:50%; display:flex; align-items:center; justify-content:center; overflow:hidden;
   background:radial-gradient(circle at 32% 28%, color-mix(in srgb, var(--rarity, var(--rarity-commun)) 20%, var(--surface-alt)), var(--surface-alt) 70%);
   border:2.5px solid var(--rarity, var(--rarity-commun)); flex:none; position:relative;
   box-shadow:0 3px 10px color-mix(in srgb, var(--rarity, var(--rarity-commun)) 30%, transparent);
 }
+.icon-wrap img{width:100%;height:100%;object-fit:cover;border-radius:50%;}
 .dex-shiny-spark{position:absolute; top:-6px; right:-4px; font-size:13px; filter:drop-shadow(0 1px 1px rgba(0,0,0,.3));}
 .tag-shiny{display:inline-flex; align-items:center; gap:4px; font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.04em; padding:3px 9px; border-radius:6px; background:var(--grad-gold); color:#3a2a08; box-shadow:0 2px 8px color-mix(in srgb, var(--gold) 45%, transparent);}
 .icon-wrap svg{width:28px;height:28px; stroke:var(--rarity, var(--rarity-commun));}
-.dex-card.locked .icon-wrap{filter:grayscale(1) brightness(.8); opacity:.5; border-color:var(--line); box-shadow:none; background:var(--surface-alt);}
+.dex-card.locked .icon-wrap{
+  filter:grayscale(.6) brightness(.92); opacity:.62;
+  border-color:var(--rarity, var(--line));
+  box-shadow:0 2px 8px color-mix(in srgb, var(--rarity, var(--blue-600)) 22%, transparent);
+  background:radial-gradient(circle at 32% 28%, color-mix(in srgb, var(--rarity, var(--rarity-commun)) 14%, var(--surface-alt)), var(--surface-alt) 70%);
+}
 .dex-card .name{font-size:11.5px; font-weight:800; text-align:center; line-height:1.15;}
 .dex-card .stagepips{display:flex; gap:3px;}
 .dex-card .stagepips i{width:5px;height:5px;border-radius:50%;background:var(--line);}
@@ -957,8 +963,9 @@ function renderDex(){
     const stage = sp.stages[stageIdx];
     const pips = sp.stages.map((_,i)=>`<i class="${i<=stageIdx && caught?'on':''}"></i>`).join('');
     const shinyOn = caught && isShinyActive(sp.shiny);
+    const dexBadge = (caught && sp.image) ? `<img src="${sp.image}" alt="">` : icon(sp.icon);
     return `<div class="dex-card ${caught?'':'locked'}" data-sp="${sp.id}">
-      <div class="icon-wrap" style="--rarity:${shinyOn?(sp.shiny.color||'#d9a441'):`var(--rarity-${sp.rarity})`};">${shinyOn?'<span class="dex-shiny-spark">✨</span>':''}${icon(sp.icon)}</div>
+      <div class="icon-wrap" style="--rarity:${shinyOn?(sp.shiny.color||'#d9a441'):`var(--rarity-${sp.rarity})`};">${shinyOn?'<span class="dex-shiny-spark">✨</span>':''}${dexBadge}</div>
       <div class="name">${caught? escapeHtml(stage.name) : '???'}</div>
       <div class="stagepips">${pips}</div>
     </div>`;
@@ -981,7 +988,7 @@ function openDexDetail(spId){
     <div style="display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;">
       <span class="rarity-tag ${sp.rarity}">${RARITY_LABEL[sp.rarity]}</span>
       ${shinyOn?`<span class="tag-shiny">✨ ${escapeHtml(sp.shiny.label||'Shiny')}</span>`:''}
-      <div class="icon-wrap" style="--rarity:${shinyOn?(sp.shiny.color||'#d9a441'):`var(--rarity-${sp.rarity})`}; width:80px;height:80px;${caught?'':'filter:grayscale(1) opacity(.5);'}">${icon(sp.icon,'style="width:38px;height:38px;"')}</div>
+      <div class="icon-wrap" style="--rarity:${shinyOn?(sp.shiny.color||'#d9a441'):`var(--rarity-${sp.rarity})`}; width:80px;height:80px;${caught?'':'filter:grayscale(1) opacity(.5);'}">${(caught && sp.image)?`<img src="${sp.image}" alt="">`:icon(sp.icon,'style="width:38px;height:38px;"')}</div>
       <h2 class="capture-name">${caught? escapeHtml(stage.name) : '???'}</h2>
       <p class="capture-hint" style="max-width:320px;">${caught? escapeHtml(stage.desc) : "Pas encore rencontré. Explorez la carte pour le trouver."}</p>
       ${caught? `<p class="capture-hint">Tampons : <strong style="color:var(--ink);">${entry.candy}</strong>${stage.need!=null?` / ${stage.need} pour évoluer`:''}</p>`:''}
