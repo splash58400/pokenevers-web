@@ -1,61 +1,56 @@
-// POST /.netlify/functions/deploy-gamedata
+// POST /deploy-gamedata
 //
 // Reçoit { password, gamedata } depuis le bouton « Déployer sur le jeu » de
 // admin.html. Si le mot de passe correspond à la variable d'environnement
-// ADMIN_PASSWORD configurée sur Netlify (Site settings → Environment variables),
-// les données sont enregistrées dans Netlify Blobs : le jeu les sert alors
-// immédiatement via /gamedata.json (voir gamedata.js + netlify.toml).
+// ADMIN_PASSWORD configurée sur Cloudflare Pages (Settings → Environment
+// variables), les données sont enregistrées dans Workers KV : le jeu les
+// sert alors immédiatement via /gamedata.json (voir gamedata.json.js).
 //
 // Le mot de passe n'est JAMAIS écrit dans le code livré au navigateur : il ne
 // vit que côté serveur (variable d'environnement) et dans la mémoire de session
 // de l'admin qui le saisit.
 "use strict";
 
-const { getConfiguredStore } = require("./blob-store");
+import { writeGamedata } from "./_lib/kv-store.js";
 
-const STORE_NAME = "pokenevers";
-const BLOB_KEY = "gamedata";
 const REQUIRED_ARRAYS = ["merchants", "pois", "events", "missions", "badges"];
 
-exports.handler = async function handler(event) {
-  if (event.httpMethod !== "POST") {
-    return { statusCode: 405, body: JSON.stringify({ error: "Method Not Allowed" }) };
-  }
+function json(status, obj) {
+  return new Response(JSON.stringify(obj), {
+    status,
+    headers: { "content-type": "application/json; charset=utf-8" }
+  });
+}
 
-  const adminPassword = process.env.ADMIN_PASSWORD;
+export async function onRequestPost(context) {
+  const { request, env } = context;
+
+  const adminPassword = env.ADMIN_PASSWORD;
   if (!adminPassword) {
-    return {
-      statusCode: 500,
-      headers: { "content-type": "application/json; charset=utf-8" },
-      body: JSON.stringify({
-        error:
-          "La variable d'environnement ADMIN_PASSWORD n'est pas configurée sur Netlify (Site settings → Environment variables), le déploiement est donc désactivé."
-      })
-    };
+    return json(500, {
+      error:
+        "La variable d'environnement ADMIN_PASSWORD n'est pas configurée sur Cloudflare Pages (Settings → Environment variables), le déploiement est donc désactivé."
+    });
   }
 
   let body;
   try {
-    body = JSON.parse(event.body || "{}");
+    body = await request.json();
   } catch (err) {
-    return { statusCode: 400, headers: { "content-type": "application/json; charset=utf-8" }, body: JSON.stringify({ error: "JSON invalide." }) };
+    return json(400, { error: "JSON invalide." });
   }
 
   if (typeof body.password !== "string" || body.password !== adminPassword) {
-    return { statusCode: 401, headers: { "content-type": "application/json; charset=utf-8" }, body: JSON.stringify({ error: "Mot de passe incorrect." }) };
+    return json(401, { error: "Mot de passe incorrect." });
   }
 
   const gamedata = body.gamedata;
   if (!gamedata || typeof gamedata !== "object" || Array.isArray(gamedata)) {
-    return { statusCode: 400, headers: { "content-type": "application/json; charset=utf-8" }, body: JSON.stringify({ error: "Données de jeu invalides." }) };
+    return json(400, { error: "Données de jeu invalides." });
   }
   for (const key of REQUIRED_ARRAYS) {
     if (!Array.isArray(gamedata[key])) {
-      return {
-        statusCode: 400,
-        headers: { "content-type": "application/json; charset=utf-8" },
-        body: JSON.stringify({ error: `Champ manquant ou invalide dans les données : ${key}` })
-      };
+      return json(400, { error: `Champ manquant ou invalide dans les données : ${key}` });
     }
   }
 
@@ -63,19 +58,12 @@ exports.handler = async function handler(event) {
   if (gamedata.version == null) gamedata.version = 1;
 
   try {
-    const store = getConfiguredStore(STORE_NAME);
-    await store.setJSON(BLOB_KEY, gamedata);
+    await writeGamedata(env, gamedata);
   } catch (err) {
-    return {
-      statusCode: 500,
-      headers: { "content-type": "application/json; charset=utf-8" },
-      body: JSON.stringify({ error: "Échec de l'enregistrement côté serveur : " + (err && err.message ? err.message : String(err)) })
-    };
+    return json(500, {
+      error: "Échec de l'enregistrement côté serveur : " + (err && err.message ? err.message : String(err))
+    });
   }
 
-  return {
-    statusCode: 200,
-    headers: { "content-type": "application/json; charset=utf-8" },
-    body: JSON.stringify({ ok: true, updatedAt: gamedata.updatedAt })
-  };
-};
+  return json(200, { ok: true, updatedAt: gamedata.updatedAt });
+}

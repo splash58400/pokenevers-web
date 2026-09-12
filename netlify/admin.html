@@ -1,0 +1,1065 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>PokeNevers · Admin</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+:root{
+  --ink:#182333; --ink-soft:#51617a; --ink-faint:#8695ab;
+  --bg:#eef2f6; --surface:#ffffff; --surface-alt:#f3efe4;
+  --line:#dbe3ee;
+  --blue-700:#123b6b; --blue-600:#1e5aa8; --blue-500:#2f74c9; --blue-100:#dbeafc;
+  --gold:#d9a441; --gold-dark:#a97a1f; --gold-100:#faeecd;
+  --brick:#c1502e; --brick-dark:#963c22;
+  --green:#4f8f5c; --green-100:#dcf0e0;
+  --rarity-commun:#6f8298; --rarity-peu:#3e8e63; --rarity-rare:#7b5bc4; --rarity-legendaire:#d9a441;
+  --shadow-sm:0 2px 8px rgba(18,42,79,.08);
+  --shadow-lg:0 14px 34px rgba(18,42,79,.16);
+  --radius-lg:20px; --radius-md:14px; --radius-sm:10px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ink:#eaf1fb; --ink-soft:#aebedb; --ink-faint:#7c8bab;
+    --bg:#0d151f; --surface:#141f2c; --surface-alt:#1a2432;
+    --line:#26374d;
+    --blue-700:#bcdcff; --blue-600:#5c9eea; --blue-500:#3f7fca; --blue-100:#1c3859;
+    --gold:#e8bc63; --gold-dark:#f0cd85; --gold-100:#3a2f14;
+    --brick:#e2694a; --brick-dark:#c94f31;
+    --green:#6ec17e; --green-100:#123322;
+    --rarity-commun:#8ea0b8; --rarity-peu:#5db682; --rarity-rare:#a58af0; --rarity-legendaire:#e8bc63;
+    --shadow-sm:0 2px 10px rgba(0,0,0,.3); --shadow-lg:0 16px 40px rgba(0,0,0,.45);
+    color-scheme: dark;
+  }
+}
+*{box-sizing:border-box;}
+html,body{height:100%;}
+body{margin:0; background:var(--bg); color:var(--ink); font-family:"Nunito",system-ui,sans-serif; font-variant-numeric:tabular-nums;}
+h1,h2,h3,.display{font-family:"Fredoka",system-ui,sans-serif;}
+button{font-family:inherit;}
+img{max-width:100%;}
+
+#app{min-height:100vh; display:flex; flex-direction:column;}
+
+/* ---- top bar ---- */
+#topbar{
+  display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+  padding:14px 18px; background:var(--surface); border-bottom:1px solid var(--line);
+  position:sticky; top:0; z-index:50;
+}
+#topbar .logo{font-family:"Fredoka"; font-weight:700; font-size:19px; color:var(--blue-600); margin:0; flex:none;}
+#topbar .logo .accent{color:var(--gold-dark);}
+#topbar .spacer{flex:1;}
+.btn{
+  border:none; border-radius:999px; font-family:"Fredoka"; font-weight:600; font-size:13.5px;
+  padding:9px 16px; cursor:pointer; white-space:nowrap; display:inline-flex; align-items:center; gap:6px;
+}
+.btn svg{width:15px;height:15px;}
+.btn-primary{background:var(--blue-600); color:#fff;}
+.btn-gold{background:var(--gold); color:var(--blue-700);}
+.btn-ghost{background:var(--surface-alt); color:var(--ink);}
+.btn-danger{background:color-mix(in srgb, var(--brick) 14%, transparent); color:var(--brick-dark);}
+.btn-sm{padding:6px 12px; font-size:12px;}
+.btn:disabled{opacity:.45; cursor:not-allowed;}
+input[type=file].hidden-file{display:none;}
+
+/* ---- tabs ---- */
+#tabs{display:flex; gap:6px; padding:10px 18px 0 18px; background:var(--surface); overflow-x:auto; border-bottom:1px solid var(--line);}
+.tabbtn{
+  flex:none; border:none; background:none; padding:10px 16px; font-family:"Fredoka"; font-weight:600; font-size:13.5px;
+  color:var(--ink-faint); border-bottom:3px solid transparent; cursor:pointer; display:flex; align-items:center; gap:6px;
+}
+.tabbtn svg{width:16px;height:16px; stroke:var(--ink-faint);}
+.tabbtn.active{color:var(--blue-600); border-color:var(--blue-600);}
+.tabbtn.active svg{stroke:var(--blue-600);}
+.tabbtn .count{background:var(--surface-alt); color:var(--ink-soft); border-radius:999px; padding:1px 7px; font-size:11px;}
+
+/* ---- layout ---- */
+main{flex:1; padding:18px; max-width:1400px; width:100%; margin:0 auto;}
+.split{display:grid; grid-template-columns:minmax(320px,420px) 1fr; gap:16px; align-items:start;}
+@media (max-width:900px){ .split{grid-template-columns:1fr;} }
+.panel{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-lg); box-shadow:var(--shadow-sm); padding:16px;}
+.panel h2{font-size:16px; margin:0 0 4px 0;}
+.panel .hint{font-size:12px; color:var(--ink-faint); font-weight:700; margin:0 0 12px 0;}
+#mapPane{height:min(70vh,640px); border-radius:var(--radius-lg); overflow:hidden; position:relative; border:1px solid var(--line); box-shadow:var(--shadow-sm);}
+#adminMap{position:absolute; inset:0;}
+.placement-banner{
+  position:absolute; left:12px; right:12px; top:12px; z-index:500; background:var(--brick); color:#fff;
+  border-radius:12px; padding:10px 14px; font-weight:800; font-size:12.5px; display:none; align-items:center; justify-content:space-between; gap:10px;
+  box-shadow:var(--shadow-lg);
+}
+.placement-banner button{background:rgba(255,255,255,.25); color:#fff; border:none; border-radius:999px; padding:5px 12px; font-weight:700; font-size:11.5px; cursor:pointer;}
+.map-legend{position:absolute; right:10px; bottom:10px; z-index:400; background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:8px 10px; font-size:11px; font-weight:700; color:var(--ink-soft); box-shadow:var(--shadow-sm); display:flex; gap:12px;}
+.map-legend span{display:flex; align-items:center; gap:5px;}
+.legend-dot{width:9px;height:9px;border-radius:50%; display:inline-block;}
+
+/* ---- entry list/cards ---- */
+.entry-list{display:flex; flex-direction:column; gap:8px; max-height:min(70vh,640px); overflow-y:auto; padding-right:2px;}
+.entry-card{
+  border:1px solid var(--line); border-radius:var(--radius-md); padding:10px 12px; display:flex; align-items:center; gap:10px;
+  cursor:pointer; background:var(--surface);
+}
+.entry-card:hover{border-color:var(--blue-500);}
+.entry-card.editing{border-color:var(--blue-600); background:color-mix(in srgb, var(--blue-100) 40%, var(--surface));}
+.entry-card.inactive{opacity:.5;}
+.entry-icon{width:38px;height:38px;border-radius:50%; display:flex;align-items:center;justify-content:center; background:var(--surface-alt); border:2px solid var(--rarity,var(--blue-600)); flex:none;}
+.entry-icon svg{width:19px;height:19px; stroke:var(--rarity,var(--blue-600));}
+.entry-main{flex:1; min-width:0;}
+.entry-title{font-weight:800; font-size:13.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.entry-sub{font-size:11px; color:var(--ink-faint); font-weight:700;}
+.entry-badges{display:flex; gap:4px; flex-wrap:wrap;}
+.tag{font-size:9.5px; font-weight:800; text-transform:uppercase; letter-spacing:.04em; padding:2px 7px; border-radius:6px; background:var(--surface-alt); color:var(--ink-soft);}
+.tag.shiny{background:linear-gradient(135deg,var(--gold),var(--gold-dark)); color:#3a2a08;}
+.tag.off{background:color-mix(in srgb, var(--brick) 14%, transparent); color:var(--brick-dark);}
+.empty-state{padding:30px 10px; text-align:center; color:var(--ink-faint); font-weight:700; font-size:13px;}
+
+/* ---- forms ---- */
+.form-card{border:2px dashed var(--blue-500); border-radius:var(--radius-lg); padding:16px; margin-bottom:14px; background:color-mix(in srgb, var(--blue-100) 25%, var(--surface));}
+.form-grid{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
+.form-grid.single{grid-template-columns:1fr;}
+@media (max-width:520px){ .form-grid{grid-template-columns:1fr;} }
+.field{display:flex; flex-direction:column; gap:5px;}
+.field label{font-size:11.5px; font-weight:800; color:var(--ink-soft); text-transform:uppercase; letter-spacing:.03em;}
+.field input, .field select, .field textarea{
+  border:1.5px solid var(--line); background:var(--surface); border-radius:var(--radius-sm); padding:9px 11px;
+  font-family:inherit; font-size:14px; color:var(--ink); font-weight:600;
+}
+.field textarea{resize:vertical; min-height:64px;}
+.field input:focus, .field select:focus, .field textarea:focus{outline:none; border-color:var(--blue-600);}
+.field.checkbox{flex-direction:row; align-items:center; gap:8px;}
+.field.checkbox label{text-transform:none; letter-spacing:0; font-size:13px;}
+.icon-preview{width:34px;height:34px;border-radius:50%; background:var(--surface-alt); display:flex;align-items:center;justify-content:center; border:2px solid var(--blue-600); flex:none;}
+.icon-preview svg{width:17px;height:17px; stroke:var(--blue-600);}
+.icon-field-row{display:flex; align-items:center; gap:8px;}
+.form-actions{display:flex; gap:8px; margin-top:14px; flex-wrap:wrap;}
+.stage-row{display:grid; grid-template-columns:1.2fr 2fr 90px auto; gap:8px; margin-bottom:8px; align-items:start;}
+@media (max-width:640px){ .stage-row{grid-template-columns:1fr; } }
+.stage-row textarea{min-height:44px;}
+.section-title{font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:.04em; color:var(--ink-faint); margin:16px 0 8px 0;}
+.shiny-box{border:1.5px dashed var(--gold); border-radius:var(--radius-md); padding:12px; background:var(--gold-100);}
+.thumb-row{display:flex; align-items:center; gap:10px;}
+.thumb{width:56px;height:56px;border-radius:10px; object-fit:cover; border:1px solid var(--line); background:var(--surface-alt);}
+.small-note{font-size:11px; color:var(--ink-faint); font-weight:700;}
+.pick-btn{background:var(--surface); border:1.5px solid var(--blue-500); color:var(--blue-600); border-radius:999px; padding:8px 12px; font-weight:800; font-size:12px; cursor:pointer;}
+.coord-readout{font-size:12px; font-weight:800; color:var(--ink-soft);}
+
+.datebadge{display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:800; color:var(--ink-faint);}
+.footer-note{padding:20px 4px 40px 4px; text-align:center; font-size:11.5px; color:var(--ink-faint); font-weight:700;}
+
+/* ---- login gate ---- */
+#loginOverlay{position:fixed; inset:0; background:var(--bg); z-index:1000; display:flex; align-items:center; justify-content:center; padding:16px;}
+#loginOverlay .panel{max-width:380px; width:100%;}
+#loginOverlay .field{margin-bottom:10px;}
+.login-error{color:var(--brick-dark); font-weight:800; font-size:12.5px; margin:6px 0 0 0; display:none;}
+.gate-warning{background:var(--gold-100); color:var(--gold-dark); border:1px solid var(--gold); border-radius:var(--radius-md); padding:8px 12px; font-size:12px; font-weight:800; margin:0 18px 12px 18px;}
+
+/* ---- deploy status ---- */
+#deployBtn.is-busy{opacity:.7; cursor:wait;}
+</style>
+</head>
+<body>
+<div id="loginOverlay" style="display:none;">
+  <div class="panel">
+    <h2>Connexion admin</h2>
+    <p class="hint">Accès réservé à PokeNevers. Entrez le mot de passe administrateur.</p>
+    <div class="field"><label>Mot de passe</label><input type="password" id="loginPassword" placeholder="••••••••"></div>
+    <p class="login-error" id="loginError">Mot de passe incorrect.</p>
+    <div class="form-actions"><button class="btn btn-primary" id="loginBtn">Se connecter</button></div>
+  </div>
+</div>
+<div id="app">
+  <div id="topbar">
+    <p class="logo">Poke<span class="accent">Nevers</span> · Admin</p>
+    <div class="spacer"></div>
+    <button class="btn btn-ghost" id="syncBtn" title="Recharger la version actuellement en ligne dans ce brouillon">Récupérer la version en ligne</button>
+    <input type="file" id="importInput" class="hidden-file" accept="application/json">
+    <button class="btn btn-ghost" id="importBtn">Importer un gamedata.json</button>
+    <button class="btn btn-gold" id="exportBtn">Exporter gamedata.json</button>
+    <button class="btn btn-primary" id="deployBtn">Déployer sur le jeu</button>
+    <button class="btn btn-danger" id="resetAllBtn">Réinitialiser</button>
+    <button class="btn btn-ghost btn-sm" id="logoutBtn" title="Se déconnecter" style="display:none;">Déconnexion</button>
+  </div>
+  <div id="gateWarning" class="gate-warning" style="display:none;"></div>
+  <div id="tabs"></div>
+  <main id="mainArea"></main>
+  <p class="footer-note">« Déployer sur le jeu » publie vos changements immédiatement pour les joueurs. « Exporter/Importer gamedata.json » restent disponibles en secours (ex. si les fonctions serveur ne sont pas configurées).</p>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(function(){
+"use strict";
+
+/* ============================= ICONS (mêmes que le jeu) ============================= */
+const ICONS = {
+  bread:'<path d="M4 13c0-3.5 3-6.5 8-6.5s8 3 8 6.5-2 6-8 6-8-2.5-8-6Z"/><path d="M8 10.5v4M12 9.5v5M16 10.5v4" stroke-linecap="round"/>',
+  cheese:'<path d="M3 17 12 6l9 11H3Z"/><circle cx="13" cy="14" r="1"/><circle cx="9" cy="15.5" r="1"/><circle cx="16" cy="15" r="1"/>',
+  wine:'<path d="M7 4h10l-1.2 8.2a3.8 3.8 0 0 1-3.8 3.3 3.8 3.8 0 0 1-3.8-3.3L7 4Z"/><path d="M12 15.5V21M8.5 21h7"/>',
+  flower:'<circle cx="12" cy="8" r="2.4"/><circle cx="7.5" cy="11" r="2.4"/><circle cx="16.5" cy="11" r="2.4"/><circle cx="9.5" cy="15.5" r="2.4"/><circle cx="14.5" cy="15.5" r="2.4"/><circle cx="12" cy="12.5" r="1.6" fill="currentColor" stroke="none"/><path d="M12 17.5V21" stroke-linecap="round"/>',
+  chocolate:'<rect x="4" y="7" width="16" height="11" rx="1.5"/><path d="M4 12.5h16M9.3 7v11M14.7 7v11"/>',
+  coffee:'<path d="M5 9h11v6a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4V9Z"/><path d="M16 10.5h1.6a2.4 2.4 0 0 1 0 4.8H16"/><path d="M8 5.2c0 1-1 1-1 2M12 5.2c0 1-1 1-1 2" stroke-linecap="round"/>',
+  antique:'<path d="M6 20h12M9 20V9.5M15 20V9.5"/><path d="M4 9.5h16L18 4H6L4 9.5Z"/><circle cx="12" cy="14" r="2"/>',
+  vase:'<path d="M9.5 3h5l.6 3.4c1.6 1.7 2.4 3.4 2.4 5.6 0 4-2.7 9-5.5 9s-5.5-5-5.5-9c0-2.2.8-3.9 2.4-5.6L9.5 3Z"/><path d="M9 3h6" stroke-linecap="round"/>',
+  basket:'<path d="M4 10h16l-1.6 9.2a2 2 0 0 1-2 1.8H7.6a2 2 0 0 1-2-1.8L4 10Z"/><path d="M8 10 9.5 4M16 10 14.5 4M12 10v9" stroke-linecap="round"/>',
+  book:'<path d="M4 5.5C4 4.7 4.7 4 5.5 4H12v16H5.5A1.5 1.5 0 0 1 4 18.5v-13Z"/><path d="M20 5.5c0-.8-.7-1.5-1.5-1.5H12v16h6.5a1.5 1.5 0 0 0 1.5-1.5v-13Z"/>',
+  cathedral:'<path d="M12 3v3M8 6h8l2 5H6l2-5Z"/><path d="M7 11v9M17 11v9M4 20h16M10 20v-5h4v5"/>',
+  palace:'<path d="M4 20h16M5 20V10l7-5 7 5v10"/><path d="M9 20v-6h6v6M12 5v3"/>',
+  gate:'<path d="M6 20V9a6 6 0 0 1 12 0v11"/><path d="M4 20h16M9 20v-5h6v5"/>',
+  bridge:'<path d="M3 16c2-3 5-4.5 9-4.5S19 13 21 16"/><path d="M6 16v4M18 16v4M3 20h18"/>',
+  stall:'<path d="M4 9 12 4l8 5"/><path d="M5 9v10h14V9"/><path d="M9 19v-5h6v5" /><path d="M4 9h16" stroke-dasharray="2 2"/>',
+  compass:'<circle cx="12" cy="12" r="9"/><path d="M14.5 9.5 13 14l-4.5 1.5L10 11l4.5-1.5Z"/>',
+  star:'<path d="M12 3.5 14.4 9l6 .6-4.5 4 1.3 5.9L12 16.6 6.8 19.5l1.3-5.9-4.5-4 6-.6L12 3.5Z"/>',
+  map:'<path d="M9 4 4 6v14l5-2 6 2 5-2V4l-5 2-6-2Z"/><path d="M9 4v14M15 6v14"/>',
+  trophy:'<path d="M7 4h10v4a5 5 0 0 1-10 0V4Z"/><path d="M7 5H4v2a3 3 0 0 0 3 3M17 5h3v2a3 3 0 0 1-3 3"/><path d="M12 13v3M9 20h6M10 16.5h4v3.5h-4z"/>',
+  person:'<circle cx="12" cy="8.5" r="3.6"/><path d="M4.5 20c1.2-4 4-6 7.5-6s6.3 2 7.5 6"/>',
+  target:'<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="0.6" fill="currentColor"/>',
+  flag:'<path d="M6 3v18"/><path d="M6 4h11l-2.5 3.5L17 11H6"/>',
+  medal:'<circle cx="12" cy="15" r="5"/><path d="M9 10 6 3M15 10l3-7M9 10h6" stroke-linecap="round"/>',
+  plus:'<path d="M12 5v14M5 12h14" stroke-linecap="round"/>',
+  trash:'<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" stroke-linecap="round" stroke-linejoin="round"/>',
+  pin:'<path d="M12 21s7-6.5 7-12a7 7 0 0 0-14 0c0 5.5 7 12 7 12Z"/><circle cx="12" cy="9" r="2.4"/>'
+};
+function icon(name, extra){ return `<svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" ${extra||''}>${ICONS[name]||ICONS.star}</svg>`; }
+const ICON_OPTIONS = ['bread','cheese','wine','flower','chocolate','coffee','antique','vase','basket','book','cathedral','palace','gate','bridge','stall','star','trophy','compass','medal','flag','target','person','map','pin'];
+const RARITIES = [
+  {v:'commun', label:'Commun'}, {v:'peu-commun', label:'Peu commun'}, {v:'rare', label:'Rare'}, {v:'legendaire', label:'Légendaire'}
+];
+
+const ORIGIN = { lat: 46.9899, lon: 3.1580 };
+function uid(prefix){ return prefix+'_'+Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+function nowIso(){ return new Date().toISOString(); }
+function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+/* ============================= DATA ============================= */
+function emptyData(){
+  return { version:1, updatedAt: nowIso(), merchants:[], pois:[], events:[], missions:[], badges:[] };
+}
+let data = null;
+function loadDraft(){
+  try{ const raw = localStorage.getItem('pokenevers_admin_draft_v1'); return raw? JSON.parse(raw): null; }catch(e){ return null; }
+}
+function saveDraft(){
+  data.updatedAt = nowIso();
+  try{ localStorage.setItem('pokenevers_admin_draft_v1', JSON.stringify(data)); }catch(e){}
+}
+
+/* ============================= MAP ============================= */
+let map=null, merchantLayer=null, poiLayer=null, mapContainerEl=null;
+let placement=null; // {type, onPick}
+function initMap(){
+  // mapContainerEl doit déjà être inséré dans la page (voir renderMain) avant d'appeler L.map() :
+  // Leaflet calcule sa taille à l'initialisation, un élément détaché fait 0x0 et la carte reste vide.
+  map = L.map(mapContainerEl, { zoomControl:true }).setView([ORIGIN.lat, ORIGIN.lon], 16);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom:19, attribution:'© OpenStreetMap contributors'
+  }).addTo(map);
+  merchantLayer = L.layerGroup().addTo(map);
+  poiLayer = L.layerGroup().addTo(map);
+  map.on('click', (e)=>{
+    if(placement){
+      placement.onPick(e.latlng.lat, e.latlng.lng);
+      clearPlacement();
+    }
+  });
+}
+function armPlacement(type, onPick){
+  placement = {type, onPick};
+  const banner = document.getElementById('placementBanner');
+  banner.style.display='flex';
+  banner.querySelector('.ptxt').textContent = type==='merchant'
+    ? 'Cliquez sur la carte pour placer ce commerçant…'
+    : 'Cliquez sur la carte pour placer ce point d\'intérêt…';
+}
+function clearPlacement(){
+  placement=null;
+  document.getElementById('placementBanner').style.display='none';
+}
+function pinIcon(iconName, color, dim){
+  return L.divIcon({
+    className:'',
+    html:`<div style="display:flex;flex-direction:column;align-items:center;${dim?'opacity:.45;':''}">
+      <div style="width:36px;height:36px;border-radius:50%;background:#fff;border:3px solid ${color};box-shadow:0 4px 10px rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center;">
+        ${icon(iconName, `style="width:17px;height:17px;stroke:${color}"`)}
+      </div>
+      <div style="width:3px;height:9px;background:${color};margin-top:-2px;"></div>
+    </div>`,
+    iconSize:[36,48], iconAnchor:[18,48]
+  });
+}
+function refreshMapMarkers(){
+  merchantLayer.clearLayers();
+  poiLayer.clearLayers();
+  data.merchants.forEach(m=>{
+    if(m.lat==null||m.lon==null) return;
+    const color = m.shiny&&m.shiny.active ? '#d9a441' : '#1e5aa8';
+    const mk = L.marker([m.lat,m.lon], {icon:pinIcon(m.icon||'basket', color, m.active===false), draggable:true});
+    mk.addTo(merchantLayer);
+    mk.on('dragend', ()=>{ const p=mk.getLatLng(); m.lat=p.lat; m.lon=p.lng; saveDraft(); });
+    mk.on('click', ()=> editMerchant(m.id));
+    mk.bindTooltip(m.name||'(sans nom)', {direction:'top', offset:[0,-44]});
+  });
+  data.pois.forEach(p=>{
+    if(p.lat==null||p.lon==null) return;
+    const mk = L.marker([p.lat,p.lon], {icon:pinIcon(p.icon||'stall', '#a97a1f', p.active===false), draggable:true});
+    mk.addTo(poiLayer);
+    mk.on('dragend', ()=>{ const pos=mk.getLatLng(); p.lat=pos.lat; p.lon=pos.lng; saveDraft(); });
+    mk.on('click', ()=> editPoi(p.id));
+    mk.bindTooltip(p.name||'(sans nom)', {direction:'top', offset:[0,-44]});
+  });
+}
+
+/* ============================= ICON PICKER (select générique) ============================= */
+function iconSelectHtml(id, selected){
+  return `<select id="${id}">${ICON_OPTIONS.map(k=>`<option value="${k}" ${k===selected?'selected':''}>${k}</option>`).join('')}</select>`;
+}
+function wireIconPreview(selectId, previewId){
+  const sel = document.getElementById(selectId), prev = document.getElementById(previewId);
+  const update = ()=>{ prev.innerHTML = icon(sel.value); };
+  sel.addEventListener('change', update); update();
+}
+
+/* ============================= IMAGE HELPER ============================= */
+function readAndCompressImage(file, maxW, cb){
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    const img = new Image();
+    img.onload = ()=>{
+      const scale = Math.min(1, maxW/img.width);
+      const w = Math.round(img.width*scale), h = Math.round(img.height*scale);
+      const canvas = document.createElement('canvas');
+      canvas.width=w; canvas.height=h;
+      canvas.getContext('2d').drawImage(img,0,0,w,h);
+      cb(canvas.toDataURL('image/jpeg', 0.75));
+    };
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+/* ============================= TABS ============================= */
+const TABS = [
+  {id:'merchants', label:'Commerçants', icon:'basket'},
+  {id:'pois', label:"Points d'intérêt", icon:'pin'},
+  {id:'events', label:'Évènements', icon:'star'},
+  {id:'missions', label:'Missions', icon:'flag'},
+  {id:'badges', label:'Badges', icon:'medal'},
+];
+let activeTab='merchants';
+let editingMerchantId=null, editingPoiId=null, editingEventId=null, editingMissionId=null, editingBadgeId=null;
+
+function renderTabs(){
+  const el = document.getElementById('tabs');
+  el.innerHTML = TABS.map(t=>`<button class="tabbtn ${activeTab===t.id?'active':''}" data-tab="${t.id}">
+    ${icon(t.icon)}<span>${t.label}</span><span class="count">${(data[t.id]||[]).length}</span></button>`).join('');
+  el.querySelectorAll('.tabbtn').forEach(b=> b.addEventListener('click', ()=>{ activeTab=b.dataset.tab; editingMerchantId=editingPoiId=editingEventId=editingMissionId=editingBadgeId=null; newBadgeDraft=null; clearPlacement(); renderAll(); }));
+}
+
+function renderMain(){
+  const main = document.getElementById('mainArea');
+  if(activeTab==='merchants'){
+    main.innerHTML = `<div class="split">
+      <div class="panel">
+        <h2>Commerçants</h2>
+        <p class="hint">Fiche dédiée par commerçant : catégorie, rareté, description, évolutions, skin shiny temporaire.</p>
+        <button class="btn btn-primary" id="addMerchantBtn" style="margin-bottom:12px;">${icon('plus')} Nouveau commerçant</button>
+        <div id="merchantFormSlot"></div>
+        <div class="entry-list" id="merchantList"></div>
+      </div>
+      <div class="panel" style="padding:10px;">
+        <div id="mapPane">
+          <div class="placement-banner" id="placementBanner"><span class="ptxt"></span><button id="cancelPlacementBtn">Annuler</button></div>
+          <div class="map-legend"><span><i class="legend-dot" style="background:#1e5aa8;"></i>Commerçants</span><span><i class="legend-dot" style="background:#a97a1f;"></i>POI</span></div>
+        </div>
+      </div>
+    </div>`;
+    document.getElementById('addMerchantBtn').onclick = ()=>{ editingMerchantId='new'; renderMerchantForm(); };
+    renderMerchantList();
+    if(editingMerchantId) renderMerchantForm();
+  } else if(activeTab==='pois'){
+    main.innerHTML = `<div class="split">
+      <div class="panel">
+        <h2>Points d'intérêt</h2>
+        <p class="hint">Lieux réels à faire tourner en jeu pour des récompenses (façon PokéStop).</p>
+        <button class="btn btn-primary" id="addPoiBtn" style="margin-bottom:12px;">${icon('plus')} Nouveau point d'intérêt</button>
+        <div id="poiFormSlot"></div>
+        <div class="entry-list" id="poiList"></div>
+      </div>
+      <div class="panel" style="padding:10px;">
+        <div id="mapPane">
+          <div class="placement-banner" id="placementBanner"><span class="ptxt"></span><button id="cancelPlacementBtn">Annuler</button></div>
+          <div class="map-legend"><span><i class="legend-dot" style="background:#1e5aa8;"></i>Commerçants</span><span><i class="legend-dot" style="background:#a97a1f;"></i>POI</span></div>
+        </div>
+      </div>
+    </div>`;
+    document.getElementById('addPoiBtn').onclick = ()=>{ editingPoiId='new'; renderPoiForm(); };
+    renderPoiList();
+    if(editingPoiId) renderPoiForm();
+  } else if(activeTab==='events'){
+    main.innerHTML = `<div class="panel">
+      <h2>Évènements</h2>
+      <p class="hint">Périodes spéciales avec bonus, affichées dans l'onglet Évènements du jeu.</p>
+      <button class="btn btn-primary" id="addEventBtn" style="margin-bottom:12px;">${icon('plus')} Nouvel évènement</button>
+      <div id="eventFormSlot"></div>
+      <div class="entry-list" id="eventList" style="max-height:none;"></div>
+    </div>`;
+    document.getElementById('addEventBtn').onclick = ()=>{ editingEventId='new'; renderEventForm(); };
+    renderEventList();
+    if(editingEventId) renderEventForm();
+  } else if(activeTab==='missions'){
+    main.innerHTML = `<div class="panel">
+      <h2>Missions</h2>
+      <p class="hint">Objectifs à accomplir en jeu, avec récompense (XP, tampons, badge).</p>
+      <button class="btn btn-primary" id="addMissionBtn" style="margin-bottom:12px;">${icon('plus')} Nouvelle mission</button>
+      <div id="missionFormSlot"></div>
+      <div class="entry-list" id="missionList" style="max-height:none;"></div>
+    </div>`;
+    document.getElementById('addMissionBtn').onclick = ()=>{ editingMissionId='new'; renderMissionForm(); };
+    renderMissionList();
+    if(editingMissionId) renderMissionForm();
+  } else if(activeTab==='badges'){
+    main.innerHTML = `<div class="panel">
+      <h2>Badges</h2>
+      <p class="hint">Récompenses de collection affichées dans le profil du joueur.</p>
+      <button class="btn btn-primary" id="addBadgeBtn" style="margin-bottom:12px;">${icon('plus')} Nouveau badge</button>
+      <div id="badgeFormSlot"></div>
+      <div class="entry-list" id="badgeList" style="max-height:none;"></div>
+    </div>`;
+    document.getElementById('addBadgeBtn').onclick = ()=>{ editingBadgeId='new'; newBadgeDraft=null; renderBadgeForm(); };
+    renderBadgeList();
+    if(editingBadgeId) renderBadgeForm();
+  }
+  if(activeTab==='merchants' || activeTab==='pois'){
+    if(!mapContainerEl){ mapContainerEl = document.createElement('div'); mapContainerEl.id = 'adminMap'; }
+    // Toujours réinsérer AVANT d'initialiser Leaflet dessus : voir la note dans initMap().
+    document.getElementById('mapPane').prepend(mapContainerEl);
+    if(!map) initMap();
+    setTimeout(()=>map.invalidateSize(),50);
+    document.getElementById('cancelPlacementBtn').onclick = clearPlacement;
+    refreshMapMarkers();
+  }
+}
+function renderAll(){ renderTabs(); renderMain(); }
+
+/* ============================= MERCHANTS ============================= */
+function renderMerchantList(){
+  const el = document.getElementById('merchantList');
+  if(data.merchants.length===0){ el.innerHTML = `<div class="empty-state">Aucun commerçant pour l'instant.</div>`; return; }
+  el.innerHTML = data.merchants.map(m=>{
+    const shinyOn = m.shiny && m.shiny.active && (!m.shiny.expiresAt || new Date(m.shiny.expiresAt) > new Date());
+    return `<div class="entry-card ${editingMerchantId===m.id?'editing':''} ${m.active===false?'inactive':''}" data-id="${m.id}">
+      <div class="entry-icon" style="--rarity:var(--rarity-${m.rarity||'commun'});">${icon(m.icon||'basket')}</div>
+      <div class="entry-main">
+        <div class="entry-title">${escapeHtml(m.name)||'(sans nom)'}</div>
+        <div class="entry-sub">${(m.stages||[]).length} stade(s) · ${m.lat!=null? m.lat.toFixed(4)+', '+m.lon.toFixed(4) : 'non placé'}</div>
+        <div class="entry-badges" style="margin-top:4px;">
+          <span class="tag">${(RARITIES.find(r=>r.v===m.rarity)||{}).label||m.rarity}</span>
+          ${shinyOn?`<span class="tag shiny">✨ Shiny</span>`:''}
+          ${m.active===false?`<span class="tag off">Inactif</span>`:''}
+        </div>
+      </div>
+      <button class="btn btn-sm btn-danger delbtn" data-id="${m.id}" title="Supprimer">${icon('trash')}</button>
+    </div>`;
+  }).join('');
+  el.querySelectorAll('.entry-card').forEach(c=> c.addEventListener('click', (e)=>{ if(e.target.closest('.delbtn')) return; editMerchant(c.dataset.id); }));
+  el.querySelectorAll('.delbtn').forEach(b=> b.addEventListener('click', (e)=>{ e.stopPropagation(); deleteMerchant(b.dataset.id); }));
+}
+function editMerchant(id){ editingMerchantId=id; renderMerchantForm(); const c=document.querySelector(`#merchantList .entry-card[data-id="${id}"]`); if(c) c.scrollIntoView({block:'nearest'}); renderMerchantList(); }
+function deleteMerchant(id){
+  if(!confirm('Supprimer ce commerçant ?')) return;
+  data.merchants = data.merchants.filter(m=>m.id!==id);
+  if(editingMerchantId===id) editingMerchantId=null;
+  saveDraft(); renderTabs(); renderMerchantList(); refreshMapMarkers();
+  document.getElementById('merchantFormSlot').innerHTML='';
+}
+function renderMerchantForm(){
+  const isNew = editingMerchantId==='new';
+  const m = isNew ? { id:uid('m'), name:'', category:'', icon:'basket', rarity:'commun', lat:null, lon:null, description:'', image:null, stages:[{name:'',desc:'',need:null}], active:true, shiny:{active:false,label:'',color:'#d9a441',expiresAt:''} } : data.merchants.find(x=>x.id===editingMerchantId);
+  if(!m){ editingMerchantId=null; document.getElementById('merchantFormSlot').innerHTML=''; return; }
+  if(!m.shiny) m.shiny = {active:false,label:'',color:'#d9a441',expiresAt:''};
+  if(!m.stages || !m.stages.length) m.stages=[{name:'',desc:'',need:null}];
+  const slot = document.getElementById('merchantFormSlot');
+  slot.innerHTML = `<div class="form-card">
+    <div class="form-grid">
+      <div class="field"><label>Nom</label><input id="f_name" value="${escapeHtml(m.name)}" placeholder="Ex. Boulangerie du Pont"></div>
+      <div class="field"><label>Catégorie (libre)</label><input id="f_category" value="${escapeHtml(m.category||'')}" placeholder="Ex. Boulangerie"></div>
+      <div class="field"><label>Icône</label><div class="icon-field-row"><div class="icon-preview" id="f_icon_preview"></div>${iconSelectHtml('f_icon', m.icon)}</div></div>
+      <div class="field"><label>Rareté</label><select id="f_rarity">${RARITIES.map(r=>`<option value="${r.v}" ${r.v===m.rarity?'selected':''}>${r.label}</option>`).join('')}</select></div>
+    </div>
+    <div class="field" style="margin-top:12px;"><label>Description</label><textarea id="f_desc" placeholder="Ce que les joueurs verront dans la fiche">${escapeHtml(m.description)}</textarea></div>
+
+    <div class="section-title">Position sur la carte</div>
+    <div class="thumb-row">
+      <button class="pick-btn" id="f_pick_pos" type="button">${m.lat!=null?'Déplacer sur la carte':'Choisir sur la carte'}</button>
+      <span class="coord-readout" id="f_coord_readout">${m.lat!=null? m.lat.toFixed(5)+', '+m.lon.toFixed(5) : 'Non placé'}</span>
+    </div>
+
+    <div class="section-title">Photo (optionnelle)</div>
+    <div class="thumb-row">
+      <img class="thumb" id="f_thumb" src="${m.image||''}" style="${m.image?'':'display:none;'}">
+      <input type="file" accept="image/*" id="f_image">
+    </div>
+    <p class="small-note">L'image est compressée et intégrée directement au fichier gamedata.json — préférez de petites photos.</p>
+
+    <div class="section-title">Stades d'évolution</div>
+    <div id="stagesWrap"></div>
+    <button class="btn btn-ghost btn-sm" id="addStageBtn" type="button">${icon('plus')} Ajouter un stade</button>
+
+    <div class="section-title">Skin « shiny » temporaire</div>
+    <div class="shiny-box">
+      <div class="field checkbox"><input type="checkbox" id="f_shiny_active" ${m.shiny.active?'checked':''}><label for="f_shiny_active">Mettre ce commerçant en avant avec un skin rare</label></div>
+      <div class="form-grid" style="margin-top:10px;">
+        <div class="field"><label>Libellé</label><input id="f_shiny_label" value="${escapeHtml(m.shiny.label)}" placeholder="Ex. Édition Halloween"></div>
+        <div class="field"><label>Couleur</label><input type="color" id="f_shiny_color" value="${m.shiny.color||'#d9a441'}"></div>
+        <div class="field"><label>Se termine le</label><input type="datetime-local" id="f_shiny_expires" value="${m.shiny.expiresAt? toLocalInput(m.shiny.expiresAt): ''}"></div>
+      </div>
+      <p class="small-note">Laissez la date vide pour un shiny actif jusqu'à ce que vous le désactiviez.</p>
+    </div>
+
+    <div class="field checkbox" style="margin-top:14px;"><input type="checkbox" id="f_active" ${m.active!==false?'checked':''}><label for="f_active">Commerçant actif (visible en jeu)</label></div>
+
+    <div class="form-actions">
+      <button class="btn btn-primary" id="saveMerchantBtn">Enregistrer</button>
+      <button class="btn btn-ghost" id="cancelMerchantBtn">Annuler</button>
+    </div>
+  </div>`;
+  wireIconPreview('f_icon','f_icon_preview');
+  renderStageRows(m.stages);
+  document.getElementById('addStageBtn').onclick = ()=>{ m.stages.push({name:'',desc:'',need:null}); renderStageRows(m.stages); };
+  document.getElementById('f_pick_pos').onclick = ()=> armPlacement('merchant', (lat,lon)=>{
+    m.lat=lat; m.lon=lon; document.getElementById('f_coord_readout').textContent = lat.toFixed(5)+', '+lon.toFixed(5);
+  });
+  document.getElementById('f_image').onchange = (e)=>{
+    const file = e.target.files[0]; if(!file) return;
+    readAndCompressImage(file, 480, (dataUrl)=>{ m.image=dataUrl; const t=document.getElementById('f_thumb'); t.src=dataUrl; t.style.display='block'; });
+  };
+  document.getElementById('cancelMerchantBtn').onclick = ()=>{ editingMerchantId=null; clearPlacement(); slot.innerHTML=''; renderMerchantList(); };
+  document.getElementById('saveMerchantBtn').onclick = ()=>{
+    m.name = document.getElementById('f_name').value.trim() || 'Commerçant sans nom';
+    m.category = document.getElementById('f_category').value.trim();
+    m.icon = document.getElementById('f_icon').value;
+    m.rarity = document.getElementById('f_rarity').value;
+    m.description = document.getElementById('f_desc').value.trim();
+    m.active = document.getElementById('f_active').checked;
+    m.stages = readStageRows();
+    m.shiny = {
+      active: document.getElementById('f_shiny_active').checked,
+      label: document.getElementById('f_shiny_label').value.trim(),
+      color: document.getElementById('f_shiny_color').value,
+      expiresAt: fromLocalInput(document.getElementById('f_shiny_expires').value)
+    };
+    if(isNew) data.merchants.push(m);
+    editingMerchantId=null; clearPlacement();
+    saveDraft(); renderTabs(); slot.innerHTML=''; renderMerchantList(); refreshMapMarkers();
+  };
+}
+function renderStageRows(stages){
+  const wrap = document.getElementById('stagesWrap');
+  wrap.innerHTML = stages.map((s,i)=>`<div class="stage-row" data-i="${i}">
+    <input class="stage-name" value="${escapeHtml(s.name)}" placeholder="Nom du stade ${i+1}">
+    <textarea class="stage-desc" placeholder="Description">${escapeHtml(s.desc)}</textarea>
+    <input class="stage-need" type="number" min="0" placeholder="Seuil" value="${s.need!=null?s.need:''}">
+    <button class="btn btn-sm btn-danger stage-del" type="button" ${stages.length<=1?'disabled':''}>${icon('trash')}</button>
+  </div>`).join('');
+  wrap.querySelectorAll('.stage-del').forEach(b=> b.addEventListener('click', ()=>{
+    const i = +b.closest('.stage-row').dataset.i;
+    stages.splice(i,1); renderStageRows(stages);
+  }));
+}
+function readStageRows(){
+  return Array.from(document.querySelectorAll('#stagesWrap .stage-row')).map(row=>({
+    name: row.querySelector('.stage-name').value.trim() || 'Stade',
+    desc: row.querySelector('.stage-desc').value.trim(),
+    need: row.querySelector('.stage-need').value === '' ? null : Number(row.querySelector('.stage-need').value)
+  }));
+}
+function toLocalInput(iso){ try{ const d=new Date(iso); const p=n=>String(n).padStart(2,'0'); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`; }catch(e){ return ''; } }
+function fromLocalInput(v){ if(!v) return ''; const d=new Date(v); return isNaN(d) ? '' : d.toISOString(); }
+
+/* ============================= POIS ============================= */
+function renderPoiList(){
+  const el = document.getElementById('poiList');
+  if(data.pois.length===0){ el.innerHTML = `<div class="empty-state">Aucun point d'intérêt pour l'instant.</div>`; return; }
+  el.innerHTML = data.pois.map(p=>`<div class="entry-card ${editingPoiId===p.id?'editing':''} ${p.active===false?'inactive':''}" data-id="${p.id}">
+    <div class="entry-icon" style="--rarity:var(--gold-dark);">${icon(p.icon||'stall')}</div>
+    <div class="entry-main">
+      <div class="entry-title">${escapeHtml(p.name)||'(sans nom)'}</div>
+      <div class="entry-sub">${p.lat!=null? p.lat.toFixed(4)+', '+p.lon.toFixed(4) : 'non placé'} · +${p.rewardXp||15} XP</div>
+    </div>
+    <button class="btn btn-sm btn-danger delbtn" data-id="${p.id}">${icon('trash')}</button>
+  </div>`).join('');
+  el.querySelectorAll('.entry-card').forEach(c=> c.addEventListener('click', (e)=>{ if(e.target.closest('.delbtn')) return; editPoi(c.dataset.id); }));
+  el.querySelectorAll('.delbtn').forEach(b=> b.addEventListener('click', (e)=>{ e.stopPropagation(); deletePoi(b.dataset.id); }));
+}
+function editPoi(id){ editingPoiId=id; renderPoiForm(); renderPoiList(); }
+function deletePoi(id){
+  if(!confirm('Supprimer ce point d\'intérêt ?')) return;
+  data.pois = data.pois.filter(p=>p.id!==id);
+  if(editingPoiId===id) editingPoiId=null;
+  saveDraft(); renderTabs(); renderPoiList(); refreshMapMarkers();
+  document.getElementById('poiFormSlot').innerHTML='';
+}
+function renderPoiForm(){
+  const isNew = editingPoiId==='new';
+  const p = isNew ? {id:uid('p'), name:'', icon:'stall', lat:null, lon:null, rewardCoinsMin:2, rewardCoinsMax:4, rewardXp:15, active:true} : data.pois.find(x=>x.id===editingPoiId);
+  if(!p){ editingPoiId=null; document.getElementById('poiFormSlot').innerHTML=''; return; }
+  const slot = document.getElementById('poiFormSlot');
+  slot.innerHTML = `<div class="form-card">
+    <div class="form-grid">
+      <div class="field"><label>Nom</label><input id="f_pname" value="${escapeHtml(p.name)}" placeholder="Ex. Cathédrale Saint-Cyr"></div>
+      <div class="field"><label>Icône</label><div class="icon-field-row"><div class="icon-preview" id="f_picon_preview"></div>${iconSelectHtml('f_picon', p.icon)}</div></div>
+      <div class="field"><label>Tampons min</label><input id="f_pcmin" type="number" min="0" value="${p.rewardCoinsMin}"></div>
+      <div class="field"><label>Tampons max</label><input id="f_pcmax" type="number" min="0" value="${p.rewardCoinsMax}"></div>
+      <div class="field"><label>XP par visite</label><input id="f_pxp" type="number" min="0" value="${p.rewardXp}"></div>
+    </div>
+    <div class="section-title">Position sur la carte</div>
+    <div class="thumb-row">
+      <button class="pick-btn" id="f_ppick" type="button">${p.lat!=null?'Déplacer sur la carte':'Choisir sur la carte'}</button>
+      <span class="coord-readout" id="f_pcoord">${p.lat!=null? p.lat.toFixed(5)+', '+p.lon.toFixed(5) : 'Non placé'}</span>
+    </div>
+    <div class="field checkbox" style="margin-top:14px;"><input type="checkbox" id="f_pactive" ${p.active!==false?'checked':''}><label for="f_pactive">Actif (visible en jeu)</label></div>
+    <div class="form-actions">
+      <button class="btn btn-primary" id="savePoiBtn">Enregistrer</button>
+      <button class="btn btn-ghost" id="cancelPoiBtn">Annuler</button>
+    </div>
+  </div>`;
+  wireIconPreview('f_picon','f_picon_preview');
+  document.getElementById('f_ppick').onclick = ()=> armPlacement('poi', (lat,lon)=>{
+    p.lat=lat; p.lon=lon; document.getElementById('f_pcoord').textContent = lat.toFixed(5)+', '+lon.toFixed(5);
+  });
+  document.getElementById('cancelPoiBtn').onclick = ()=>{ editingPoiId=null; clearPlacement(); slot.innerHTML=''; renderPoiList(); };
+  document.getElementById('savePoiBtn').onclick = ()=>{
+    p.name = document.getElementById('f_pname').value.trim() || "Point d'intérêt";
+    p.icon = document.getElementById('f_picon').value;
+    p.rewardCoinsMin = Number(document.getElementById('f_pcmin').value)||0;
+    p.rewardCoinsMax = Number(document.getElementById('f_pcmax').value)||0;
+    p.rewardXp = Number(document.getElementById('f_pxp').value)||0;
+    p.active = document.getElementById('f_pactive').checked;
+    if(isNew) data.pois.push(p);
+    editingPoiId=null; clearPlacement();
+    saveDraft(); renderTabs(); slot.innerHTML=''; renderPoiList(); refreshMapMarkers();
+  };
+}
+
+/* ============================= EVENTS ============================= */
+const BONUS_TYPES = [
+  {v:'none', label:'Aucun bonus mécanique (juste narratif)'},
+  {v:'double_tampons', label:'x2 tampons sur toutes les captures'},
+  {v:'boost_species', label:"Apparitions boostées d'un commerçant"},
+];
+function renderEventList(){
+  const el = document.getElementById('eventList');
+  if(data.events.length===0){ el.innerHTML = `<div class="empty-state">Aucun évènement pour l'instant.</div>`; return; }
+  el.innerHTML = data.events.map(ev=>`<div class="entry-card ${editingEventId===ev.id?'editing':''} ${ev.active===false?'inactive':''}" data-id="${ev.id}">
+    <div class="entry-icon"><span style="--rarity:var(--gold-dark);">${icon(ev.icon||'star')}</span></div>
+    <div class="entry-main">
+      <div class="entry-title">${escapeHtml(ev.name)}</div>
+      <div class="entry-sub">${fmtDateShort(ev.start)} → ${fmtDateShort(ev.end)}</div>
+    </div>
+    <button class="btn btn-sm btn-danger delbtn" data-id="${ev.id}">${icon('trash')}</button>
+  </div>`).join('');
+  el.querySelectorAll('.entry-card').forEach(c=> c.addEventListener('click', (e)=>{ if(e.target.closest('.delbtn')) return; editingEventId=c.dataset.id; renderEventForm(); renderEventList(); }));
+  el.querySelectorAll('.delbtn').forEach(b=> b.addEventListener('click', (e)=>{ e.stopPropagation();
+    if(!confirm("Supprimer cet évènement ?")) return;
+    data.events = data.events.filter(x=>x.id!==b.dataset.id); if(editingEventId===b.dataset.id) editingEventId=null;
+    saveDraft(); renderTabs(); renderEventList(); document.getElementById('eventFormSlot').innerHTML='';
+  }));
+}
+function fmtDateShort(iso){ if(!iso) return '—'; const d=new Date(iso); return d.toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'})+' '+d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}); }
+function renderEventForm(){
+  const isNew = editingEventId==='new';
+  const ev = isNew ? {id:uid('e'), name:'', icon:'star', description:'', bonusType:'none', bonusSpeciesId:'', bonusLabel:'', start:nowIso(), end:nowIso(), active:true} : data.events.find(x=>x.id===editingEventId);
+  if(!ev){ editingEventId=null; document.getElementById('eventFormSlot').innerHTML=''; return; }
+  const slot = document.getElementById('eventFormSlot');
+  slot.innerHTML = `<div class="form-card">
+    <div class="form-grid">
+      <div class="field"><label>Nom</label><input id="f_ename" value="${escapeHtml(ev.name)}" placeholder="Ex. Marché d'automne"></div>
+      <div class="field"><label>Icône</label><div class="icon-field-row"><div class="icon-preview" id="f_eicon_preview"></div>${iconSelectHtml('f_eicon', ev.icon)}</div></div>
+      <div class="field"><label>Début</label><input type="datetime-local" id="f_estart" value="${toLocalInput(ev.start)}"></div>
+      <div class="field"><label>Fin</label><input type="datetime-local" id="f_eend" value="${toLocalInput(ev.end)}"></div>
+    </div>
+    <div class="field" style="margin-top:12px;"><label>Description</label><textarea id="f_edesc" placeholder="Affiché dans l'onglet Évènements">${escapeHtml(ev.description)}</textarea></div>
+    <div class="form-grid" style="margin-top:12px;">
+      <div class="field"><label>Type de bonus</label><select id="f_ebonustype">${BONUS_TYPES.map(b=>`<option value="${b.v}" ${b.v===ev.bonusType?'selected':''}>${b.label}</option>`).join('')}</select></div>
+      <div class="field" id="f_ebonusspecies_wrap" style="${ev.bonusType==='boost_species'?'':'display:none;'}"><label>Commerçant boosté</label><select id="f_ebonusspecies">${data.merchants.map(m=>`<option value="${m.id}" ${m.id===ev.bonusSpeciesId?'selected':''}>${escapeHtml(m.name)}</option>`).join('')}</select></div>
+      <div class="field"><label>Libellé du bonus (affiché aux joueurs)</label><input id="f_ebonuslabel" value="${escapeHtml(ev.bonusLabel)}" placeholder="Ex. +50% d'apparitions"></div>
+    </div>
+    <div class="field checkbox" style="margin-top:14px;"><input type="checkbox" id="f_eactive" ${ev.active!==false?'checked':''}><label for="f_eactive">Actif</label></div>
+    <div class="form-actions">
+      <button class="btn btn-primary" id="saveEventBtn">Enregistrer</button>
+      <button class="btn btn-ghost" id="cancelEventBtn">Annuler</button>
+    </div>
+  </div>`;
+  wireIconPreview('f_eicon','f_eicon_preview');
+  document.getElementById('f_ebonustype').onchange = (e)=>{ document.getElementById('f_ebonusspecies_wrap').style.display = e.target.value==='boost_species'?'':'none'; };
+  document.getElementById('cancelEventBtn').onclick = ()=>{ editingEventId=null; slot.innerHTML=''; renderEventList(); };
+  document.getElementById('saveEventBtn').onclick = ()=>{
+    ev.name = document.getElementById('f_ename').value.trim() || 'Évènement';
+    ev.icon = document.getElementById('f_eicon').value;
+    ev.description = document.getElementById('f_edesc').value.trim();
+    ev.bonusType = document.getElementById('f_ebonustype').value;
+    ev.bonusSpeciesId = document.getElementById('f_ebonusspecies') ? document.getElementById('f_ebonusspecies').value : '';
+    ev.bonusLabel = document.getElementById('f_ebonuslabel').value.trim();
+    ev.start = fromLocalInput(document.getElementById('f_estart').value) || nowIso();
+    ev.end = fromLocalInput(document.getElementById('f_eend').value) || nowIso();
+    ev.active = document.getElementById('f_eactive').checked;
+    if(isNew) data.events.push(ev);
+    editingEventId=null; saveDraft(); renderTabs(); slot.innerHTML=''; renderEventList();
+  };
+}
+
+/* ============================= MISSIONS ============================= */
+const MISSION_TYPES = [
+  {v:'capture_count', label:'Capturer N commerçants différents'},
+  {v:'poi_spin_count', label:"Faire tourner N points d'intérêt"},
+  {v:'catch_species', label:'Capturer un commerçant précis'},
+  {v:'catch_rarity', label:"Capturer un commerçant d'une rareté donnée"},
+];
+function renderMissionList(){
+  const el = document.getElementById('missionList');
+  if(data.missions.length===0){ el.innerHTML = `<div class="empty-state">Aucune mission pour l'instant.</div>`; return; }
+  el.innerHTML = data.missions.map(mi=>`<div class="entry-card ${editingMissionId===mi.id?'editing':''} ${mi.active===false?'inactive':''}" data-id="${mi.id}">
+    <div class="entry-icon"><span style="--rarity:var(--blue-600);">${icon('flag')}</span></div>
+    <div class="entry-main">
+      <div class="entry-title">${escapeHtml(mi.title)}</div>
+      <div class="entry-sub">${(MISSION_TYPES.find(t=>t.v===mi.type)||{}).label||mi.type} · +${mi.rewardXp||0} XP, +${mi.rewardCoins||0} tampons</div>
+    </div>
+    <button class="btn btn-sm btn-danger delbtn" data-id="${mi.id}">${icon('trash')}</button>
+  </div>`).join('');
+  el.querySelectorAll('.entry-card').forEach(c=> c.addEventListener('click', (e)=>{ if(e.target.closest('.delbtn')) return; editingMissionId=c.dataset.id; renderMissionForm(); renderMissionList(); }));
+  el.querySelectorAll('.delbtn').forEach(b=> b.addEventListener('click', (e)=>{ e.stopPropagation();
+    if(!confirm('Supprimer cette mission ?')) return;
+    data.missions = data.missions.filter(x=>x.id!==b.dataset.id); if(editingMissionId===b.dataset.id) editingMissionId=null;
+    saveDraft(); renderTabs(); renderMissionList(); document.getElementById('missionFormSlot').innerHTML='';
+  }));
+}
+function renderMissionForm(){
+  const isNew = editingMissionId==='new';
+  const mi = isNew ? {id:uid('mi'), title:'', description:'', type:'capture_count', target:5, targetSpeciesId:'', targetRarity:'commun', rewardXp:50, rewardCoins:5, rewardBadgeId:'', active:true} : data.missions.find(x=>x.id===editingMissionId);
+  if(!mi){ editingMissionId=null; document.getElementById('missionFormSlot').innerHTML=''; return; }
+  const slot = document.getElementById('missionFormSlot');
+  slot.innerHTML = `<div class="form-card">
+    <div class="form-grid">
+      <div class="field"><label>Titre</label><input id="f_mititle" value="${escapeHtml(mi.title)}" placeholder="Ex. Tournée du marché"></div>
+      <div class="field"><label>Type</label><select id="f_mitype">${MISSION_TYPES.map(t=>`<option value="${t.v}" ${t.v===mi.type?'selected':''}>${t.label}</option>`).join('')}</select></div>
+      <div class="field" id="f_mitarget_wrap"><label>Objectif (nombre)</label><input id="f_mitarget" type="number" min="1" value="${mi.target||1}"></div>
+      <div class="field" id="f_mispecies_wrap" style="${mi.type==='catch_species'?'':'display:none;'}"><label>Commerçant visé</label><select id="f_mispecies">${data.merchants.map(m=>`<option value="${m.id}" ${m.id===mi.targetSpeciesId?'selected':''}>${escapeHtml(m.name)}</option>`).join('')}</select></div>
+      <div class="field" id="f_mirarity_wrap" style="${mi.type==='catch_rarity'?'':'display:none;'}"><label>Rareté visée</label><select id="f_mirarity">${RARITIES.map(r=>`<option value="${r.v}" ${r.v===mi.targetRarity?'selected':''}>${r.label}</option>`).join('')}</select></div>
+    </div>
+    <div class="field" style="margin-top:12px;"><label>Description</label><textarea id="f_midesc" placeholder="Affichée au joueur">${escapeHtml(mi.description)}</textarea></div>
+    <div class="form-grid" style="margin-top:12px;">
+      <div class="field"><label>Récompense XP</label><input id="f_mixp" type="number" min="0" value="${mi.rewardXp||0}"></div>
+      <div class="field"><label>Récompense tampons</label><input id="f_micoins" type="number" min="0" value="${mi.rewardCoins||0}"></div>
+      <div class="field"><label>Badge débloqué (optionnel)</label><select id="f_mibadge"><option value="">— aucun —</option>${data.badges.map(b=>`<option value="${b.id}" ${b.id===mi.rewardBadgeId?'selected':''}>${escapeHtml(b.label)}</option>`).join('')}</select></div>
+    </div>
+    <div class="field checkbox" style="margin-top:14px;"><input type="checkbox" id="f_miactive" ${mi.active!==false?'checked':''}><label for="f_miactive">Active</label></div>
+    <div class="form-actions">
+      <button class="btn btn-primary" id="saveMissionBtn">Enregistrer</button>
+      <button class="btn btn-ghost" id="cancelMissionBtn">Annuler</button>
+    </div>
+  </div>`;
+  const typeSel = document.getElementById('f_mitype');
+  typeSel.onchange = ()=>{
+    const t = typeSel.value;
+    document.getElementById('f_mitarget_wrap').style.display = (t==='capture_count'||t==='poi_spin_count') ? '' : 'none';
+    document.getElementById('f_mispecies_wrap').style.display = t==='catch_species' ? '' : 'none';
+    document.getElementById('f_mirarity_wrap').style.display = t==='catch_rarity' ? '' : 'none';
+  };
+  document.getElementById('cancelMissionBtn').onclick = ()=>{ editingMissionId=null; slot.innerHTML=''; renderMissionList(); };
+  document.getElementById('saveMissionBtn').onclick = ()=>{
+    mi.title = document.getElementById('f_mititle').value.trim() || 'Mission';
+    mi.type = document.getElementById('f_mitype').value;
+    mi.target = Number(document.getElementById('f_mitarget').value)||1;
+    mi.targetSpeciesId = document.getElementById('f_mispecies') ? document.getElementById('f_mispecies').value : '';
+    mi.targetRarity = document.getElementById('f_mirarity') ? document.getElementById('f_mirarity').value : '';
+    mi.description = document.getElementById('f_midesc').value.trim();
+    mi.rewardXp = Number(document.getElementById('f_mixp').value)||0;
+    mi.rewardCoins = Number(document.getElementById('f_micoins').value)||0;
+    mi.rewardBadgeId = document.getElementById('f_mibadge').value;
+    mi.active = document.getElementById('f_miactive').checked;
+    if(isNew) data.missions.push(mi);
+    editingMissionId=null; saveDraft(); renderTabs(); slot.innerHTML=''; renderMissionList();
+  };
+}
+
+/* ============================= BADGES ============================= */
+const BADGE_CRITERIA = [
+  {v:'captures_count', label:'Avoir capturé N commerçants différents'},
+  {v:'species_captured', label:'Avoir capturé un commerçant précis'},
+  {v:'all_captured', label:'Avoir capturé toute la collection'},
+  {v:'mission_completed', label:'Avoir terminé une mission précise'},
+];
+function renderBadgeList(){
+  const el = document.getElementById('badgeList');
+  if(data.badges.length===0){ el.innerHTML = `<div class="empty-state">Aucun badge pour l'instant.</div>`; return; }
+  el.innerHTML = data.badges.map(b=>`<div class="entry-card ${editingBadgeId===b.id?'editing':''} ${b.active===false?'inactive':''}" data-id="${b.id}">
+    <div class="entry-icon"><span style="--rarity:var(--gold-dark);">${icon(b.icon||'medal')}</span></div>
+    <div class="entry-main">
+      <div class="entry-title">${escapeHtml(b.label)}</div>
+      <div class="entry-sub">${(BADGE_CRITERIA.find(c=>c.v===b.criteriaType)||{}).label||b.criteriaType}</div>
+    </div>
+    <button class="btn btn-sm btn-danger delbtn" data-id="${b.id}">${icon('trash')}</button>
+  </div>`).join('');
+  el.querySelectorAll('.entry-card').forEach(c=> c.addEventListener('click', (e)=>{ if(e.target.closest('.delbtn')) return; editingBadgeId=c.dataset.id; renderBadgeForm(); renderBadgeList(); }));
+  el.querySelectorAll('.delbtn').forEach(b=> b.addEventListener('click', (e)=>{ e.stopPropagation();
+    if(!confirm('Supprimer ce badge ?')) return;
+    data.badges = data.badges.filter(x=>x.id!==b.dataset.id); if(editingBadgeId===b.dataset.id) editingBadgeId=null;
+    saveDraft(); renderTabs(); renderBadgeList(); document.getElementById('badgeFormSlot').innerHTML='';
+  }));
+}
+let newBadgeDraft = null;
+function renderBadgeForm(){
+  const isNew = editingBadgeId==='new';
+  if(isNew && !newBadgeDraft) newBadgeDraft = {id:uid('b'), label:'', icon:'medal', description:'', criteriaType:'captures_count', criteriaValue:5, active:true};
+  const b = isNew ? newBadgeDraft : data.badges.find(x=>x.id===editingBadgeId);
+  if(!b){ editingBadgeId=null; document.getElementById('badgeFormSlot').innerHTML=''; return; }
+  const slot = document.getElementById('badgeFormSlot');
+  const needsSpecies = b.criteriaType==='species_captured';
+  const needsMission = b.criteriaType==='mission_completed';
+  const needsNumber = b.criteriaType==='captures_count';
+  slot.innerHTML = `<div class="form-card">
+    <div class="form-grid">
+      <div class="field"><label>Nom</label><input id="f_blabel" value="${escapeHtml(b.label)}" placeholder="Ex. Collectionneur"></div>
+      <div class="field"><label>Icône</label><div class="icon-field-row"><div class="icon-preview" id="f_bicon_preview"></div>${iconSelectHtml('f_bicon', b.icon)}</div></div>
+      <div class="field"><label>Critère</label><select id="f_bcrit">${BADGE_CRITERIA.map(c=>`<option value="${c.v}" ${c.v===b.criteriaType?'selected':''}>${c.label}</option>`).join('')}</select></div>
+      <div class="field" id="f_bvalue_wrap">
+        <label>Valeur</label>
+        ${needsSpecies
+          ? `<select id="f_bvalue">${data.merchants.map(m=>`<option value="${m.id}" ${m.id===b.criteriaValue?'selected':''}>${escapeHtml(m.name)}</option>`).join('')}</select>`
+          : needsMission
+          ? `<select id="f_bvalue">${data.missions.map(m=>`<option value="${m.id}" ${m.id===b.criteriaValue?'selected':''}>${escapeHtml(m.title)}</option>`).join('')}</select>`
+          : needsNumber
+          ? `<input id="f_bvalue" type="number" min="1" value="${b.criteriaValue||1}">`
+          : `<input id="f_bvalue" value="" disabled placeholder="Non applicable">`}
+      </div>
+    </div>
+    <div class="field" style="margin-top:12px;"><label>Description</label><textarea id="f_bdesc" placeholder="Affichée au survol/au clic dans le profil">${escapeHtml(b.description)}</textarea></div>
+    <div class="field checkbox" style="margin-top:14px;"><input type="checkbox" id="f_bactive" ${b.active!==false?'checked':''}><label for="f_bactive">Actif</label></div>
+    <div class="form-actions">
+      <button class="btn btn-primary" id="saveBadgeBtn">Enregistrer</button>
+      <button class="btn btn-ghost" id="cancelBadgeBtn">Annuler</button>
+    </div>
+  </div>`;
+  wireIconPreview('f_bicon','f_bicon_preview');
+  document.getElementById('f_bcrit').onchange = ()=>{
+    b.label = document.getElementById('f_blabel').value;
+    b.description = document.getElementById('f_bdesc').value;
+    b.criteriaType = document.getElementById('f_bcrit').value;
+    renderBadgeForm();
+  };
+  document.getElementById('cancelBadgeBtn').onclick = ()=>{ editingBadgeId=null; newBadgeDraft=null; slot.innerHTML=''; renderBadgeList(); };
+  document.getElementById('saveBadgeBtn').onclick = ()=>{
+    b.label = document.getElementById('f_blabel').value.trim() || 'Badge';
+    b.icon = document.getElementById('f_bicon').value;
+    b.criteriaType = document.getElementById('f_bcrit').value;
+    const valEl = document.getElementById('f_bvalue');
+    b.criteriaValue = (b.criteriaType==='all_captured') ? null : (needsNumberFor(b.criteriaType) ? Number(valEl.value)||1 : valEl.value);
+    b.description = document.getElementById('f_bdesc').value.trim();
+    b.active = document.getElementById('f_bactive').checked;
+    if(isNew){ data.badges.push(b); newBadgeDraft=null; }
+    editingBadgeId=null; saveDraft(); renderTabs(); slot.innerHTML=''; renderBadgeList();
+  };
+}
+function needsNumberFor(t){ return t==='captures_count'; }
+
+/* ============================= EXPORT / IMPORT ============================= */
+function exportData(){
+  const clean = JSON.parse(JSON.stringify(data));
+  clean.updatedAt = nowIso();
+  const blob = new Blob([JSON.stringify(clean, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'gamedata.json';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(()=> URL.revokeObjectURL(url), 4000);
+}
+function importData(file){
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    try{
+      const parsed = JSON.parse(reader.result);
+      data = Object.assign(emptyData(), parsed);
+      ['merchants','pois','events','missions','badges'].forEach(k=>{ if(!Array.isArray(data[k])) data[k]=[]; });
+      editingMerchantId=editingPoiId=editingEventId=editingMissionId=editingBadgeId=null; newBadgeDraft=null;
+      saveDraft(); renderAll();
+      alert('Import réussi : '+data.merchants.length+' commerçant(s), '+data.pois.length+' POI, '+data.events.length+' évènement(s), '+data.missions.length+' mission(s), '+data.badges.length+' badge(s).');
+    }catch(e){ alert("Fichier invalide : "+e.message); }
+  };
+  reader.readAsText(file);
+}
+
+/* ============================= DÉPLOIEMENT / VERSION EN LIGNE ============================= */
+async function fetchLiveDataOrEmpty(){
+  try{
+    const res = await fetch('./gamedata.json', {cache:'no-store'});
+    if(res.ok){
+      const json = await res.json();
+      if(json && typeof json==='object'){
+        ['merchants','pois','events','missions','badges'].forEach(k=>{ if(!Array.isArray(json[k])) json[k]=[]; });
+        return json;
+      }
+    }
+  }catch(e){ /* pas de réseau, ou gamedata.json absent : on retombe sur des données vides */ }
+  return emptyData();
+}
+async function syncFromLive(){
+  if(!confirm('Remplacer le brouillon local par la version actuellement en ligne ? Vos modifications non déployées seront perdues.')) return;
+  const btn = document.getElementById('syncBtn'); const label = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Récupération…';
+  const live = await fetchLiveDataOrEmpty();
+  data = live;
+  editingMerchantId=editingPoiId=editingEventId=editingMissionId=editingBadgeId=null; newBadgeDraft=null;
+  saveDraft(); renderAll();
+  btn.disabled = false; btn.textContent = label;
+  alert('Version en ligne chargée dans le brouillon.');
+}
+
+async function deployToGame(){
+  const btn = document.getElementById('deployBtn');
+  const pw = sessionStorage.getItem(SESSION_PW_KEY) || '';
+  const label = btn.textContent;
+  btn.disabled = true; btn.classList.add('is-busy'); btn.textContent = 'Déploiement…';
+  try{
+    const clean = JSON.parse(JSON.stringify(data));
+    const res = await fetch('/deploy-gamedata', {
+      method:'POST',
+      headers:{'content-type':'application/json'},
+      body: JSON.stringify({ password: pw, gamedata: clean })
+    });
+    if(res.status===200){
+      alert('Déployé sur le jeu ! Les joueurs verront vos changements au prochain chargement (quelques secondes s\'ils ont déjà l\'app ouverte).');
+    } else if(res.status===401){
+      alert("Mot de passe refusé par le serveur. Vous allez être reconnecté(e).");
+      logout();
+    } else {
+      let msg = 'Code '+res.status;
+      try{ const j = await res.json(); if(j && j.error) msg = j.error; }catch(e){}
+      alert("Échec du déploiement : "+msg+"\n\nEn attendant, vous pouvez utiliser Exporter/Importer manuellement.");
+    }
+  }catch(e){
+    alert("Impossible de contacter le serveur de déploiement (fonctions serveur non configurées, ou site en simple hébergement statique).\n\nUtilisez Exporter/Importer manuellement en attendant.\n\nDétail : "+e.message);
+  } finally {
+    btn.disabled = false; btn.classList.remove('is-busy'); btn.textContent = label;
+  }
+}
+
+/* ============================= CONNEXION (protection légère de l'admin) ============================= */
+// Ceci n'est PAS une vraie sécurité côté client (le code est visible dans le
+// navigateur) : c'est un simple filtre de confort qui vérifie le mot de passe
+// auprès de la fonction serveur verify-password.js, laquelle lit la même
+// variable d'environnement ADMIN_PASSWORD que le déploiement. Tant que cette
+// variable n'est pas configurée sur l'hébergeur (ou que les fonctions ne sont
+// pas disponibles), l'accès à l'admin reste ouvert pour ne pas bloquer la
+// mise en route du projet.
+const SESSION_PW_KEY = 'pokenevers_admin_pw';
+const SESSION_AUTHED_KEY = 'pokenevers_admin_authed';
+
+async function checkPasswordWithServer(pw){
+  try{
+    const res = await fetch('/verify-password', {
+      method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({password: pw||''})
+    });
+    if(res.status===200) return 'ok';
+    if(res.status===401) return 'wrong';
+    return 'unconfigured'; // ADMIN_PASSWORD absent côté serveur, ou autre souci -> ne pas bloquer
+  }catch(e){
+    return 'unavailable'; // pas de fonctions Netlify disponibles (file://, hébergement statique simple…)
+  }
+}
+function showGateWarning(kind){
+  const el = document.getElementById('gateWarning');
+  if(kind==='unconfigured'){
+    el.textContent = "⚠️ La variable ADMIN_PASSWORD n'est pas configurée côté serveur : cette page admin n'est protégée par aucun mot de passe pour l'instant.";
+    el.style.display='block';
+  } else if(kind==='unavailable'){
+    el.textContent = "⚠️ Les fonctions serveur ne sont pas disponibles ici (test local, ou hébergement statique simple) : mot de passe et déploiement en un clic désactivés. Utilisez Exporter/Importer.";
+    el.style.display='block';
+  } else {
+    el.style.display='none';
+  }
+}
+function showLoginForm(){
+  document.getElementById('loginOverlay').style.display='flex';
+  document.getElementById('app').style.display='none';
+  document.getElementById('loginError').style.display='none';
+  const input = document.getElementById('loginPassword');
+  input.value=''; setTimeout(()=>input.focus(), 30);
+}
+function hideLoginForm(){
+  document.getElementById('loginOverlay').style.display='none';
+  document.getElementById('app').style.display='';
+}
+function logout(){
+  try{ sessionStorage.removeItem(SESSION_PW_KEY); sessionStorage.removeItem(SESSION_AUTHED_KEY); }catch(e){}
+  showLoginForm();
+}
+async function attemptLogin(){
+  const pw = document.getElementById('loginPassword').value;
+  const status = await checkPasswordWithServer(pw);
+  if(status==='wrong'){
+    document.getElementById('loginError').style.display='block';
+    return;
+  }
+  try{
+    sessionStorage.setItem(SESSION_PW_KEY, pw);
+    sessionStorage.setItem(SESSION_AUTHED_KEY, '1');
+  }catch(e){}
+  hideLoginForm();
+  document.getElementById('logoutBtn').style.display = status==='ok' ? '' : 'none';
+  showGateWarning(status==='ok' ? null : status);
+  startApp();
+}
+
+/* ============================= BOOT ============================= */
+function startApp(){
+  if(started) return;
+  started = true;
+  boot();
+}
+let started = false;
+async function boot(){
+  data = loadDraft();
+  if(!data){ data = await fetchLiveDataOrEmpty(); }
+  ['merchants','pois','events','missions','badges'].forEach(k=>{ if(!Array.isArray(data[k])) data[k]=[]; });
+  document.getElementById('exportBtn').onclick = exportData;
+  document.getElementById('importBtn').onclick = ()=> document.getElementById('importInput').click();
+  document.getElementById('importInput').onchange = (e)=>{ const f=e.target.files[0]; if(f) importData(f); e.target.value=''; };
+  document.getElementById('syncBtn').onclick = syncFromLive;
+  document.getElementById('deployBtn').onclick = deployToGame;
+  document.getElementById('logoutBtn').onclick = logout;
+  document.getElementById('resetAllBtn').onclick = ()=>{
+    if(!confirm('Effacer toutes les données de ce brouillon local ? (pensez à exporter avant si besoin)')) return;
+    data = emptyData(); saveDraft(); editingMerchantId=editingPoiId=editingEventId=editingMissionId=editingBadgeId=null; newBadgeDraft=null; renderAll();
+  };
+  renderAll();
+}
+
+async function initGate(){
+  document.getElementById('loginBtn').onclick = attemptLogin;
+  document.getElementById('loginPassword').addEventListener('keydown', (e)=>{ if(e.key==='Enter') attemptLogin(); });
+  let authed = false;
+  try{ authed = sessionStorage.getItem(SESSION_AUTHED_KEY)==='1'; }catch(e){}
+  if(authed){
+    const storedPw = (()=>{ try{ return sessionStorage.getItem(SESSION_PW_KEY)||''; }catch(e){ return ''; } })();
+    const status = await checkPasswordWithServer(storedPw);
+    if(status==='ok' || status==='unconfigured' || status==='unavailable'){
+      document.getElementById('logoutBtn').style.display = status==='ok' ? '' : 'none';
+      showGateWarning(status==='ok' ? null : status);
+      startApp();
+      return;
+    }
+  }
+  showLoginForm();
+}
+document.addEventListener('DOMContentLoaded', initGate);
+
+})();
+</script>
+</body>
+</html>
