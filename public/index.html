@@ -183,6 +183,13 @@ button{font-family:inherit;}
 #compassBtn{bottom:154px;}
 #compassBtn.active svg{stroke:var(--brick);}
 
+/* Badge niveau/XP du joueur, coin bas-gauche de la carte — le vrai #statusBar (en haut)
+   est masqué par #tabbar (voir commentaire "bottom nav" plus bas), donc ce badge autonome
+   est le seul indicateur de niveau réellement visible pour le joueur, uniquement sur la carte. */
+.map-level-badge-wrap{position:absolute; left:14px; bottom:calc(14px + env(safe-area-inset-bottom,0px)); z-index:400;}
+.map-level-badge-wrap .pill{cursor:pointer;}
+.map-level-badge-wrap .pill:active{transform:scale(.96);}
+
 /* ---------- bottom nav ---------- */
 #tabbar{
   position:relative; z-index:410;
@@ -370,6 +377,7 @@ input.text-input:focus{outline:none; border-color:var(--blue-600);}
     </div>
     <button class="recenter-btn" id="compassBtn" title="Boussole (rotation de la carte)"></button>
     <button class="recenter-btn following" id="recenterBtn" title="Recentrer"></button>
+    <div class="map-level-badge-wrap" id="mapLevelBadge"></div>
   </div>
 
   <div id="dexScreen" class="screen" style="display:none;"></div>
@@ -986,6 +994,23 @@ function renderStatusBar(){
       <div>${icon('star', 'style="width:15px;height:15px;stroke:var(--gold-dark)"')}</div>
       <div>${state.coins}<br><small style="margin-top:-2px;">tampons</small></div>
     </div>`;
+  renderMapLevelBadge();
+}
+// Badge niveau/XP visible dans le coin bas-gauche de la carte (demande de Jérémy) —
+// tenu à jour à chaque appel de renderStatusBar(), donc toujours synchro avec l'XP réel.
+// Un tap dessus ouvre l'onglet Profil, comme un raccourci.
+function renderMapLevelBadge(){
+  const el = document.getElementById('mapLevelBadge');
+  if(!el) return;
+  const lvl = levelFromXp(state.xp);
+  const cur = xpForLevel(lvl), next = xpForLevel(lvl+1);
+  const pct = Math.max(0,Math.min(100, Math.round((state.xp-cur)/(next-cur)*100)));
+  el.innerHTML = `<div class="pill" id="mapLevelBadgeBtn" title="Voir mon profil">
+      <div class="badge-circle">${lvl}</div>
+      <div><small>Niveau</small><div class="xpbar"><i style="width:${pct}%"></i></div></div>
+    </div>`;
+  const btn = document.getElementById('mapLevelBadgeBtn');
+  if(btn) btn.addEventListener('click', ()=> switchView('profile'));
 }
 
 /* ============================= DEX SCREEN ============================= */
