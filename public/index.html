@@ -966,7 +966,7 @@ function renderDex(){
     const dexBadge = (caught && sp.image) ? `<img src="${sp.image}" alt="">` : icon(sp.icon);
     return `<div class="dex-card ${caught?'':'locked'}" data-sp="${sp.id}">
       <div class="icon-wrap" style="--rarity:${shinyOn?(sp.shiny.color||'#d9a441'):`var(--rarity-${sp.rarity})`};">${shinyOn?'<span class="dex-shiny-spark">✨</span>':''}${dexBadge}</div>
-      <div class="name">${caught? escapeHtml(stage.name) : '???'}</div>
+      <div class="name">${caught? escapeHtml(sp.name||stage.name) : '???'}</div>
       <div class="stagepips">${pips}</div>
     </div>`;
   }).join('');
@@ -989,8 +989,9 @@ function openDexDetail(spId){
       <span class="rarity-tag ${sp.rarity}">${RARITY_LABEL[sp.rarity]}</span>
       ${shinyOn?`<span class="tag-shiny">✨ ${escapeHtml(sp.shiny.label||'Shiny')}</span>`:''}
       <div class="icon-wrap" style="--rarity:${shinyOn?(sp.shiny.color||'#d9a441'):`var(--rarity-${sp.rarity})`}; width:80px;height:80px;${caught?'':'filter:grayscale(1) opacity(.5);'}">${(caught && sp.image)?`<img src="${sp.image}" alt="">`:icon(sp.icon,'style="width:38px;height:38px;"')}</div>
-      <h2 class="capture-name">${caught? escapeHtml(stage.name) : '???'}</h2>
-      <p class="capture-hint" style="max-width:320px;">${caught? escapeHtml(stage.desc) : "Pas encore rencontré. Explorez la carte pour le trouver."}</p>
+      <h2 class="capture-name">${caught? escapeHtml(sp.name||stage.name) : '???'}</h2>
+      ${(caught && sp.name && sp.name!==stage.name)?`<p class="capture-stage-name">${escapeHtml(stage.name)}</p>`:''}
+      <p class="capture-hint" style="max-width:320px;">${caught? escapeHtml(sp.description||stage.desc) : "Pas encore rencontré. Explorez la carte pour le trouver."}</p>
       ${caught? `<p class="capture-hint">Tampons : <strong style="color:var(--ink);">${entry.candy}</strong>${stage.need!=null?` / ${stage.need} pour évoluer`:''}</p>`:''}
       ${nextStage? `<button class="btn ${canEvolve?'btn-gold':'btn-ghost'}" id="evolveBtn" ${canEvolve?'':'disabled'} style="margin-top:8px;">Faire évoluer${canEvolve?` → ${escapeHtml(nextStage.name)}`:''}</button>`:''}
       <button class="btn btn-ghost" id="closeSheetBtn" style="margin-top:8px;">Fermer</button>
