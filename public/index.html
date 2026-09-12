@@ -301,6 +301,15 @@ input.text-input:focus{outline:none; border-color:var(--blue-600);}
 @keyframes roundwon{0%{transform:scale(1);}40%{transform:scale(1.08);}100%{transform:scale(1);}}
 .capture-name{font-family:"Fredoka"; font-size:20px; margin:0;}
 .capture-stage-name{font-size:12px; color:var(--ink-faint); font-weight:700; margin:-2px 0 0; text-transform:uppercase; letter-spacing:.03em;}
+
+.battle-code-input{width:100%; max-width:220px; text-align:center; font-family:"Fredoka"; font-size:20px; letter-spacing:.08em; text-transform:uppercase; padding:10px 12px; border-radius:var(--radius-sm); border:2px solid var(--line); background:var(--surface-alt); color:var(--ink);}
+.battle-code-input:focus{outline:none; border-color:var(--blue-500);}
+.battle-wheel-wrap{position:relative; width:200px; height:200px; margin:6px auto 2px;}
+.battle-wheel-pointer{position:absolute; top:-13px; left:50%; transform:translateX(-50%); width:0;height:0; border-left:11px solid transparent; border-right:11px solid transparent; border-top:18px solid var(--ink); filter:drop-shadow(0 2px 2px rgba(0,0,0,.3)); z-index:2;}
+.battle-wheel{width:100%; height:100%; border-radius:50%; position:relative; box-shadow:var(--shadow-lg); border:4px solid var(--surface); transition:transform 3.1s cubic-bezier(.12,.82,.2,1);}
+.battle-wheel-hub{position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:42px;height:42px;border-radius:50%; background:var(--surface); box-shadow:var(--shadow-md); display:flex;align-items:center;justify-content:center; font-size:18px; z-index:1;}
+.battle-wheel-label{position:absolute; top:50%; left:50%; width:0; height:0;}
+.battle-wheel-label span{display:inline-block; font-size:22px; margin-left:-11px; margin-top:-11px;}
 .capture-track{
   width:min(88vw,340px); height:16px; border-radius:9px; background:var(--surface-alt); border:1px solid var(--line);
   position:relative; overflow:hidden; margin-top:6px; box-shadow:inset 0 2px 4px rgba(0,0,0,.06);
@@ -540,6 +549,7 @@ function defaultState(){
     totalPoiSpins:0,
     captureCooldowns:{},
     missionsCompleted:{},
+    battleCooldowns:{},
     seenIntro:false,
     spawns:null, // generated once, persisted
   };
@@ -1007,6 +1017,7 @@ function openDexDetail(spId){
       <p class="capture-hint" style="max-width:320px;">${caught? escapeHtml(sp.description||stage.desc) : "Pas encore rencontré. Explorez la carte pour le trouver."}</p>
       ${caught? `<p class="capture-hint">Tampons : <strong style="color:var(--ink);">${entry.candy}</strong>${stage.need!=null?` / ${stage.need} pour évoluer`:''}</p>`:''}
       ${nextStage? `<button class="btn ${canEvolve?'btn-gold':'btn-ghost'}" id="evolveBtn" ${canEvolve?'':'disabled'} style="margin-top:8px;">Faire évoluer${canEvolve?` → ${escapeHtml(nextStage.name)}`:''}</button>`:''}
+      ${(caught && sp.battleEnabled)? `<button class="btn btn-gold" id="battleBtn" style="margin-top:8px;">⚔️ Défier ${escapeHtml(sp.name||stage.name)}</button>`:''}
       <button class="btn btn-ghost" id="closeSheetBtn" style="margin-top:8px;">Fermer</button>
     </div>
   </div></div>`;
@@ -1020,8 +1031,149 @@ function openDexDetail(spId){
     closeSheet(); renderDex();
     showToast(`${stage.name} a évolué en ${nextStage.name} !`);
   };
+  const battleBtn = document.getElementById('battleBtn');
+  if(battleBtn) battleBtn.onclick = ()=> openBattleSheet(sp);
 }
 function closeSheet(){ document.getElementById('modalRoot').innerHTML=''; }
+
+/* ============================= COMBAT EN BOUTIQUE (code + roue de la chance) =============================
+   Le code secret de chaque commerçant n'existe jamais côté joueur : il est écrit/affiché en boutique
+   (voir le panel admin), et vérifié uniquement par le serveur (POST /verify-battle-code, src/worker.js),
+   qui contrôle aussi la proximité GPS avant de renvoyer une récompense. Le seul rôle du navigateur ici
+   est d'envoyer le code tapé et d'animer/afficher ce que le serveur a décidé. */
+const BATTLE_SEGMENTS = [
+  { type:'xp_small', color:'var(--blue-100)', emoji:'⭐' },
+  { type:'coins_small', color:'var(--gold-100)', emoji:'🪙' },
+  { type:'xp_big', color:'var(--blue-500)', emoji:'✨' },
+  { type:'coins_big', color:'var(--gold)', emoji:'💰' },
+  { type:'jackpot', color:'var(--brick)', emoji:'💥' },
+];
+const BATTLE_COUPON_SEGMENT = { type:'coupon', color:'var(--rarity-rare)', emoji:'🎁' };
+
+function openBattleSheet(sp){
+  const root = document.getElementById('modalRoot');
+  root.innerHTML = `<div class="sheet-backdrop" id="battleBackdrop"><div class="sheet">
+    <div class="sheet-handle"></div>
+    <div style="display:flex;flex-direction:column;align-items:center;text-align:center;gap:10px;">
+      <h2 class="capture-name">⚔️ Défier ${escapeHtml(sp.name||'ce commerçant')}</h2>
+      <p class="capture-hint" style="max-width:300px;">Le code se trouve chez le commerçant. Entrez-le ici, sur place, pour tenter votre chance à la roue.</p>
+      <input id="battleCodeInput" class="battle-code-input" type="text" maxlength="16" autocomplete="off" autocapitalize="characters" placeholder="CODE">
+      <p class="capture-hint" id="battleError" style="color:var(--brick-dark); display:none;"></p>
+      <button class="btn btn-gold" id="battleSubmitBtn" style="margin-top:4px;">Valider le code</button>
+      <button class="btn btn-ghost" id="battleCancelBtn">Annuler</button>
+    </div>
+  </div></div>`;
+  document.getElementById('battleBackdrop').addEventListener('click', e=>{ if(e.target.id==='battleBackdrop') closeSheet(); });
+  document.getElementById('battleCancelBtn').onclick = closeSheet;
+  document.getElementById('battleSubmitBtn').onclick = ()=> submitBattleCode();
+  const input = document.getElementById('battleCodeInput');
+  input.focus();
+  input.addEventListener('keydown', e=>{ if(e.key==='Enter') submitBattleCode(); });
+}
+
+async function submitBattleCode(){
+  const input = document.getElementById('battleCodeInput');
+  const errEl = document.getElementById('battleError');
+  const btn = document.getElementById('battleSubmitBtn');
+  if(!input || !errEl || !btn) return;
+  const code = input.value.trim();
+  errEl.style.display='none';
+  if(!code){ errEl.textContent='Entrez un code.'; errEl.style.display='block'; return; }
+  if(curLat===null){ errEl.textContent='En attente de votre position GPS...'; errEl.style.display='block'; return; }
+  btn.disabled = true; btn.textContent = 'Vérification...';
+  let res, body;
+  try{
+    res = await fetch('./verify-battle-code', {
+      method:'POST', headers:{'content-type':'application/json'},
+      body: JSON.stringify({ code, lat: curLat, lon: curLon })
+    });
+    body = await res.json();
+  }catch(e){
+    btn.disabled = false; btn.textContent = 'Valider le code';
+    errEl.textContent = "Impossible de contacter le serveur — vérifiez votre connexion.";
+    errEl.style.display='block';
+    return;
+  }
+  if(!res.ok || !body || !body.ok){
+    btn.disabled = false; btn.textContent = 'Valider le code';
+    errEl.textContent = (body && body.error) ? body.error : 'Code invalide.';
+    errEl.style.display='block';
+    return;
+  }
+  const cooldownMs = 24*60*60*1000;
+  const last = state.battleCooldowns[body.merchantId]||0;
+  const remain = cooldownMs-(Date.now()-last);
+  if(remain>0){
+    closeSheet();
+    showToast(`Vous avez déjà défié ${body.merchantName} aujourd'hui — revenez dans ${Math.ceil(remain/3600000)} h.`);
+    return;
+  }
+  state.battleCooldowns[body.merchantId] = Date.now();
+  saveLocal();
+  openBattleWheel(body.merchantId, body.merchantName, body.reward);
+}
+
+function battleSegmentsFor(merchantId, reward){
+  const merchant = getSpeciesById(merchantId);
+  const hasCoupon = (merchant && merchant.battleCouponLabel && merchant.battleCouponLabel.trim()) || reward.type==='coupon';
+  const segs = BATTLE_SEGMENTS.slice();
+  if(hasCoupon) segs.push(BATTLE_COUPON_SEGMENT);
+  return segs;
+}
+function battleRewardText(reward){
+  switch(reward.type){
+    case 'xp_small': case 'xp_big': return `+${reward.xp} XP`;
+    case 'coins_small': case 'coins_big': return `+${reward.coins} tampons`;
+    case 'jackpot': return `JACKPOT ! +${reward.xp} XP et +${reward.coins} tampons`;
+    case 'coupon': return `🎁 ${escapeHtml(reward.couponLabel||'Bon de réduction')} — montrez cet écran en caisse (code ${escapeHtml(reward.couponCode||'')})${reward.xp?` · +${reward.xp} XP`:''}`;
+    default: return '';
+  }
+}
+function openBattleWheel(merchantId, merchantName, reward){
+  const segs = battleSegmentsFor(merchantId, reward);
+  const n = segs.length;
+  const slice = 360/n;
+  const stops = segs.map((s,i)=> `${s.color} ${i*slice}deg ${(i+1)*slice}deg`).join(', ');
+  const labels = segs.map((s,i)=>{
+    const angle = (i+0.5)*slice;
+    return `<div class="battle-wheel-label" style="transform:rotate(${angle}deg) translateY(-84px);"><span style="display:inline-block; transform:rotate(${-angle}deg);">${s.emoji}</span></div>`;
+  }).join('');
+  const root = document.getElementById('modalRoot');
+  root.innerHTML = `<div class="sheet-backdrop" id="wheelBackdrop"><div class="sheet">
+    <div class="sheet-handle"></div>
+    <div style="display:flex;flex-direction:column;align-items:center;text-align:center;gap:10px;">
+      <h2 class="capture-name">⚔️ Combat chez ${escapeHtml(merchantName)}</h2>
+      <div class="battle-wheel-wrap">
+        <div class="battle-wheel-pointer"></div>
+        <div class="battle-wheel" id="battleWheel" style="background:conic-gradient(${stops});">${labels}</div>
+        <div class="battle-wheel-hub">🎯</div>
+      </div>
+      <p class="capture-hint" id="battleResultText" style="min-height:20px;">La roue tourne...</p>
+      <button class="btn btn-gold" id="battleCloseBtn" style="margin-top:6px; display:none;">Super !</button>
+    </div>
+  </div></div>`;
+  const idx = segs.findIndex(s=> s.type===reward.type);
+  const segIndex = idx>=0? idx : 0;
+  const targetAngle = (segIndex+0.5)*slice;
+  const spins = 6;
+  const finalRotation = spins*360 + targetAngle;
+  const wheelEl = document.getElementById('battleWheel');
+  requestAnimationFrame(()=>{ wheelEl.style.transform = `rotate(${finalRotation}deg)`; });
+  setTimeout(()=>{
+    applyBattleReward(reward);
+    const resultEl = document.getElementById('battleResultText');
+    if(resultEl) resultEl.innerHTML = `<strong style="color:var(--ink);">${battleRewardText(reward)}</strong>`;
+    const closeBtn = document.getElementById('battleCloseBtn');
+    if(closeBtn){ closeBtn.style.display='inline-flex'; closeBtn.onclick = closeSheet; }
+  }, 3300);
+}
+function applyBattleReward(reward){
+  if(reward.xp) state.xp += reward.xp;
+  if(reward.coins) state.coins += reward.coins;
+  saveLocal();
+  renderStatusBar();
+  checkMissions();
+}
 
 /* ============================= EVENTS SCREEN ============================= */
 function renderEvents(){
@@ -1090,6 +1242,9 @@ function applyGameData(){
       id:m.id, icon:m.icon||'basket', rarity:m.rarity||'commun', name:m.name||'Commerçant',
       category:m.category||'', description:m.description||'', image:m.image||null,
       lat:m.lat, lon:m.lon, shiny:m.shiny||null,
+      // Note : le code secret de combat (battleCode) n'est jamais présent ici — le
+      // serveur le retire de gamedata.json avant de le servir, voir src/worker.js.
+      battleEnabled:!!m.battleEnabled, battleCouponLabel:m.battleCouponLabel||'',
       stages:(m.stages&&m.stages.length)? m.stages.map(s=>({name:s.name||m.name||'Stade', desc:s.desc||'', need:s.need!=null?s.need:null}))
                                          : [{name:m.name||'Commerçant', desc:m.description||'', need:null}]
     }));
@@ -1281,6 +1436,7 @@ async function boot(){
   state.totalPoiSpins = state.totalPoiSpins || 0;
   state.captureCooldowns = state.captureCooldowns || {};
   state.missionsCompleted = state.missionsCompleted || {};
+  state.battleCooldowns = state.battleCooldowns || {};
   await loadGameData();
   applyGameData();
   initMap();

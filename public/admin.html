@@ -461,6 +461,7 @@ function renderMerchantList(){
         <div class="entry-badges" style="margin-top:4px;">
           <span class="tag">${(RARITIES.find(r=>r.v===m.rarity)||{}).label||m.rarity}</span>
           ${shinyOn?`<span class="tag shiny">✨ Shiny</span>`:''}
+          ${m.battleEnabled?`<span class="tag">⚔️ Combat${m.battleCouponLabel?' + bon':''}</span>`:''}
           ${m.active===false?`<span class="tag off">Inactif</span>`:''}
         </div>
       </div>
@@ -480,10 +481,13 @@ function deleteMerchant(id){
 }
 function renderMerchantForm(){
   const isNew = editingMerchantId==='new';
-  const m = isNew ? { id:uid('m'), name:'', category:'', icon:'basket', rarity:'commun', lat:null, lon:null, description:'', image:null, stages:[{name:'',desc:'',need:null}], active:true, shiny:{active:false,label:'',color:'#d9a441',expiresAt:''} } : data.merchants.find(x=>x.id===editingMerchantId);
+  const m = isNew ? { id:uid('m'), name:'', category:'', icon:'basket', rarity:'commun', lat:null, lon:null, description:'', image:null, stages:[{name:'',desc:'',need:null}], active:true, shiny:{active:false,label:'',color:'#d9a441',expiresAt:''}, battleEnabled:false, battleCode:'', battleCouponLabel:'' } : data.merchants.find(x=>x.id===editingMerchantId);
   if(!m){ editingMerchantId=null; document.getElementById('merchantFormSlot').innerHTML=''; return; }
   if(!m.shiny) m.shiny = {active:false,label:'',color:'#d9a441',expiresAt:''};
   if(!m.stages || !m.stages.length) m.stages=[{name:'',desc:'',need:null}];
+  if(m.battleEnabled===undefined) m.battleEnabled=false;
+  if(m.battleCode===undefined) m.battleCode='';
+  if(m.battleCouponLabel===undefined) m.battleCouponLabel='';
   const slot = document.getElementById('merchantFormSlot');
   slot.innerHTML = `<div class="form-card">
     <div class="form-grid">
@@ -522,6 +526,17 @@ function renderMerchantForm(){
       <p class="small-note">Laissez la date vide pour un shiny actif jusqu'à ce que vous le désactiviez.</p>
     </div>
 
+    <div class="section-title">Combat en boutique</div>
+    <div class="shiny-box">
+      <div class="field checkbox"><input type="checkbox" id="f_battle_enabled" ${m.battleEnabled?'checked':''}><label for="f_battle_enabled">Activer le combat pour ce commerçant</label></div>
+      <p class="small-note">Le code ci-dessous doit être écrit/affiché chez le commerçant (carton en caisse, QR code…). Un joueur sur place peut le saisir dans le jeu pour tenter sa chance à la roue (XP, tampons, et un bon de réduction s'il y en a un ci-dessous). Il doit être physiquement à proximité du commerçant pour que le code fonctionne, et ce code n'est jamais envoyé au jeu tant qu'il n'est pas validé — un joueur ne peut pas le voir en fouillant dans le jeu.</p>
+      <div class="form-grid" style="margin-top:10px;">
+        <div class="field"><label>Code secret</label><div class="icon-field-row"><input id="f_battle_code" value="${escapeHtml(m.battleCode||'')}" placeholder="Ex. NEVERS7"><button class="btn btn-ghost btn-sm" id="genBattleCodeBtn" type="button">Générer</button></div></div>
+        <div class="field"><label>Bon de réduction (optionnel)</label><input id="f_battle_coupon" value="${escapeHtml(m.battleCouponLabel||'')}" placeholder="Ex. -10% sur un achat"></div>
+      </div>
+      <p class="small-note">Laissez le bon de réduction vide pour un combat qui ne rapporte que de l'XP et des tampons. S'il est rempli, il sort de temps en temps sur la roue en plus des autres gains.</p>
+    </div>
+
     <div class="field checkbox" style="margin-top:14px;"><input type="checkbox" id="f_active" ${m.active!==false?'checked':''}><label for="f_active">Commerçant actif (visible en jeu)</label></div>
 
     <div class="form-actions">
@@ -539,6 +554,9 @@ function renderMerchantForm(){
     const file = e.target.files[0]; if(!file) return;
     readAndCompressImage(file, 480, (dataUrl)=>{ m.image=dataUrl; const t=document.getElementById('f_thumb'); t.src=dataUrl; t.style.display='block'; });
   };
+  document.getElementById('genBattleCodeBtn').onclick = ()=>{
+    document.getElementById('f_battle_code').value = genBattleCode();
+  };
   document.getElementById('cancelMerchantBtn').onclick = ()=>{ editingMerchantId=null; clearPlacement(); slot.innerHTML=''; renderMerchantList(); };
   document.getElementById('saveMerchantBtn').onclick = ()=>{
     m.name = document.getElementById('f_name').value.trim() || 'Commerçant sans nom';
@@ -554,10 +572,19 @@ function renderMerchantForm(){
       color: document.getElementById('f_shiny_color').value,
       expiresAt: fromLocalInput(document.getElementById('f_shiny_expires').value)
     };
+    m.battleEnabled = document.getElementById('f_battle_enabled').checked;
+    m.battleCode = document.getElementById('f_battle_code').value.trim();
+    m.battleCouponLabel = document.getElementById('f_battle_coupon').value.trim();
     if(isNew) data.merchants.push(m);
     editingMerchantId=null; clearPlacement();
     saveDraft(); renderTabs(); slot.innerHTML=''; renderMerchantList(); refreshMapMarkers();
   };
+}
+function genBattleCode(){
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // sans 0/O ni 1/I pour éviter les confusions à la relecture
+  let code = '';
+  for(let i=0;i<6;i++) code += chars[Math.floor(Math.random()*chars.length)];
+  return code;
 }
 function renderStageRows(stages){
   const wrap = document.getElementById('stagesWrap');
