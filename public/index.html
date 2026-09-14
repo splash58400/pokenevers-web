@@ -465,6 +465,13 @@ const ICONS = {
 function icon(name, extra){ return `<svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" ${extra||''}>${ICONS[name]||ICONS.star}</svg>`; }
 
 /* ============================= GEOGRAPHY ============================= */
+// Clé API MapTiler de Jérémy (compte gratuit) — sert uniquement à charger un style de
+// carte personnalisé (voir DEPLOIEMENT.md) au lieu du rendu OpenStreetMap brut. Comme
+// toute clé MapTiler côté client, elle est nécessairement visible dans le code envoyé au
+// navigateur (ce n'est pas un secret à protéger comme ADMIN_PASSWORD) : c'est la
+// restriction par domaine réglée dans le tableau de bord MapTiler (Compte > Clés) qui
+// empêche quelqu'un d'autre de s'en servir et de consommer le quota gratuit.
+const MAPTILER_KEY = 'VghZbfzEO7Lo6gBZxX84';
 // Centre de référence : cœur historique de Nevers (Place Carnot / Cathédrale).
 const ORIGIN = { lat: 46.9899, lon: 3.1580 };
 // Coordonnées approximatives des lieux réels — à affiner une fois vérifiées sur place.
@@ -781,9 +788,10 @@ function divIcon(html, size, anchor, className){
 }
 function initMap(){
   map = L.map('leafletMap', { zoomControl:false, attributionControl:true }).setView([ORIGIN.lat, ORIGIN.lon], 17);
-  tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  tileLayer = L.tileLayer('https://api.maptiler.com/maps/streets-v4/256/{z}/{x}/{y}.png?key=' + MAPTILER_KEY, {
     maxZoom: 19,
-    attribution: '© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors'
+    crossOrigin: true,
+    attribution: '© <a href="https://www.maptiler.com/copyright/" target="_blank" rel="noopener">MapTiler</a> © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors'
   }).addTo(map);
 
   rangeCircle = L.circle([ORIGIN.lat, ORIGIN.lon], {

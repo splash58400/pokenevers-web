@@ -133,6 +133,28 @@ d'erreur exact, capture d'écran si possible).
   GitHub (via l'interface web, en écrasant les fichiers existants) ;
   Cloudflare redéploie automatiquement à chaque mise à jour du dépôt.
 
+## Clé MapTiler (style de carte personnalisé)
+
+Depuis la Version 17, la carte (jeu et admin) utilise le style MapTiler
+« Streets v4 » plutôt que le rendu OpenStreetMap brut. La clé API de votre
+compte MapTiler gratuit est écrite en clair dans `public/index.html` et
+`public/admin.html` (constante `MAPTILER_KEY`, tout en haut de chaque
+fichier) — c'est normal et voulu, une clé MapTiler est faite pour être
+visible côté navigateur, ce n'est pas un secret comme le mot de passe admin.
+
+Ce qui protège votre quota gratuit, c'est la **restriction par domaine** à
+régler une fois dans votre compte MapTiler (Account → Keys → Allowed URLs) :
+autorisez-y uniquement votre adresse `*.workers.dev` (ou votre domaine
+personnalisé si vous en avez configuré un). Sans cette restriction,
+n'importe qui pourrait repérer la clé dans le code de la page et l'utiliser
+ailleurs, consommant votre quota gratuit à votre place.
+
+Pour changer de style de carte plus tard (MapTiler propose plusieurs styles
+prêts à l'emploi, ou un éditeur pour en personnaliser un) : remplacez
+`streets-v4` par le nom du nouveau style dans les deux fichiers (recherchez
+`streets-v4`), directement sur GitHub — pas besoin de repasser par moi pour
+un simple changement de style.
+
 ## Domaine personnalisé (optionnel)
 
 Cloudflare permet de relier gratuitement un nom de domaine que vous possédez

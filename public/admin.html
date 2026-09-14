@@ -235,6 +235,10 @@ const RARITIES = [
 ];
 
 const ORIGIN = { lat: 46.9899, lon: 3.1580 };
+// Même clé MapTiler que le jeu (public/index.html) — voir le commentaire là-bas pour le
+// détail sécurité (clé visible côté client par nature, protégée par restriction de domaine
+// réglée dans le tableau de bord MapTiler, pas par le secret comme ADMIN_PASSWORD).
+const MAPTILER_KEY = 'VghZbfzEO7Lo6gBZxX84';
 function uid(prefix){ return prefix+'_'+Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
 function nowIso(){ return new Date().toISOString(); }
 function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
@@ -270,8 +274,8 @@ function initMap(){
   // mapContainerEl doit déjà être inséré dans la page (voir renderMain) avant d'appeler L.map() :
   // Leaflet calcule sa taille à l'initialisation, un élément détaché fait 0x0 et la carte reste vide.
   map = L.map(mapContainerEl, { zoomControl:true }).setView([ORIGIN.lat, ORIGIN.lon], 16);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom:19, attribution:'© OpenStreetMap contributors'
+  L.tileLayer('https://api.maptiler.com/maps/streets-v4/256/{z}/{x}/{y}.png?key=' + MAPTILER_KEY, {
+    maxZoom:19, crossOrigin:true, attribution:'© MapTiler © OpenStreetMap contributors'
   }).addTo(map);
   merchantLayer = L.layerGroup().addTo(map);
   poiLayer = L.layerGroup().addTo(map);
