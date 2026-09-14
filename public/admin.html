@@ -224,7 +224,9 @@ const ICONS = {
   medal:'<circle cx="12" cy="15" r="5"/><path d="M9 10 6 3M15 10l3-7M9 10h6" stroke-linecap="round"/>',
   plus:'<path d="M12 5v14M5 12h14" stroke-linecap="round"/>',
   trash:'<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" stroke-linecap="round" stroke-linejoin="round"/>',
-  pin:'<path d="M12 21s7-6.5 7-12a7 7 0 0 0-14 0c0 5.5 7 12 7 12Z"/><circle cx="12" cy="9" r="2.4"/>'
+  pin:'<path d="M12 21s7-6.5 7-12a7 7 0 0 0-14 0c0 5.5 7 12 7 12Z"/><circle cx="12" cy="9" r="2.4"/>',
+  key:'<circle cx="7.5" cy="7.5" r="3.5"/><path d="M10 10 19.5 19.5" stroke-linecap="round"/><path d="M15.5 15 17.7 12.8M18 17.5 20.2 15.3" stroke-linecap="round"/>',
+  chest:'<rect x="4" y="10.5" width="16" height="8.5" rx="1.4"/><path d="M4 10.5a8 4.3 0 0 1 16 0"/><rect x="10.4" y="12.7" width="3.2" height="3.2" rx="0.6"/>'
 };
 function icon(name, extra){ return `<svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" ${extra||''}>${ICONS[name]||ICONS.star}</svg>`; }
 const ICON_OPTIONS = ['bread','cheese','wine','flower','chocolate','coffee','antique','vase','basket','book','cathedral','palace','gate','bridge','stall','star','trophy','compass','medal','flag','target','person','map','pin'];
@@ -238,8 +240,19 @@ function nowIso(){ return new Date().toISOString(); }
 function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
 /* ============================= DATA ============================= */
+// Couleurs de clés/coffres (voir onglet Coffres) : du commun (Jaune) à l'extrêmement rare (Noir).
+const CHEST_COLORS = ['jaune','vert','bleu','violet','noir'];
+const CHEST_COLOR_LABEL = {jaune:'Jaune', vert:'Vert', bleu:'Bleu', violet:'Violet', noir:'Noir'};
+const CHEST_COLOR_SWATCH = {jaune:'#dcae00', vert:'#2f9e52', bleu:'#2f6fe0', violet:'#8b5cf6', noir:'#23262b'};
+const CHEST_OPEN_LABEL = {jaune:'30 min', vert:'1 h', bleu:'1 h 30', violet:'2 h', noir:'12 h'};
+function defaultChestRewards(){
+  return {
+    jaune:{xp:40, coins:20}, vert:{xp:80, coins:40}, bleu:{xp:150, coins:70},
+    violet:{xp:300, coins:130}, noir:{xp:900, coins:400},
+  };
+}
 function emptyData(){
-  return { version:1, updatedAt: nowIso(), merchants:[], pois:[], events:[], missions:[], badges:[] };
+  return { version:1, updatedAt: nowIso(), merchants:[], pois:[], events:[], missions:[], badges:[], chestRewards: defaultChestRewards() };
 }
 let data = null;
 function loadDraft(){
@@ -350,6 +363,7 @@ const TABS = [
   {id:'events', label:'Évènements', icon:'star'},
   {id:'missions', label:'Missions', icon:'flag'},
   {id:'badges', label:'Badges', icon:'medal'},
+  {id:'chests', label:'Coffres', icon:'chest'},
 ];
 let activeTab='merchants';
 let editingMerchantId=null, editingPoiId=null, editingEventId=null, editingMissionId=null, editingBadgeId=null;
@@ -357,7 +371,7 @@ let editingMerchantId=null, editingPoiId=null, editingEventId=null, editingMissi
 function renderTabs(){
   const el = document.getElementById('tabs');
   el.innerHTML = TABS.map(t=>`<button class="tabbtn ${activeTab===t.id?'active':''}" data-tab="${t.id}">
-    ${icon(t.icon)}<span>${t.label}</span><span class="count">${(data[t.id]||[]).length}</span></button>`).join('');
+    ${icon(t.icon)}<span>${t.label}</span>${Array.isArray(data[t.id])?`<span class="count">${data[t.id].length}</span>`:''}</button>`).join('');
   el.querySelectorAll('.tabbtn').forEach(b=> b.addEventListener('click', ()=>{ activeTab=b.dataset.tab; editingMerchantId=editingPoiId=editingEventId=editingMissionId=editingBadgeId=null; newBadgeDraft=null; clearPlacement(); renderAll(); }));
 }
 
@@ -434,6 +448,8 @@ function renderMain(){
     document.getElementById('addBadgeBtn').onclick = ()=>{ editingBadgeId='new'; newBadgeDraft=null; renderBadgeForm(); };
     renderBadgeList();
     if(editingBadgeId) renderBadgeForm();
+  } else if(activeTab==='chests'){
+    renderChestsPanel();
   }
   if(activeTab==='merchants' || activeTab==='pois'){
     if(!mapContainerEl){ mapContainerEl = document.createElement('div'); mapContainerEl.id = 'adminMap'; }
@@ -445,6 +461,43 @@ function renderMain(){
     refreshMapMarkers();
   }
 }
+/* ============================= COFFRES ============================= */
+// Les taux de trouvaille des clés/coffres aux points d'intérêt restent fixés côté jeu (voir
+// index.html) ; seule la récompense obtenue à l'ouverture (XP + tampons par couleur) est
+// réglable ici, comme demandé.
+function renderChestsPanel(){
+  const main = document.getElementById('mainArea');
+  const rows = CHEST_COLORS.map(c=>{
+    const r = data.chestRewards[c] || defaultChestRewards()[c];
+    return `<div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line);">
+      <span style="width:20px;height:20px;border-radius:50%;background:${CHEST_COLOR_SWATCH[c]};box-shadow:0 0 0 2px var(--line) inset;flex:none;"></span>
+      <div style="min-width:130px;flex:1;font-weight:800;">${CHEST_COLOR_LABEL[c]}<span class="hint" style="display:block;font-weight:600;margin:2px 0 0 0;">Ouverture : ${CHEST_OPEN_LABEL[c]}</span></div>
+      <div class="field" style="flex:1;min-width:140px;"><label>XP à l'ouverture</label><input type="number" min="0" id="f_chest_xp_${c}" value="${r.xp}"></div>
+      <div class="field" style="flex:1;min-width:140px;"><label>Tampons à l'ouverture</label><input type="number" min="0" id="f_chest_coins_${c}" value="${r.coins}"></div>
+    </div>`;
+  }).join('');
+  main.innerHTML = `<div class="panel">
+    <h2>Coffres</h2>
+    <p class="hint">Les joueurs trouvent des clés et des coffres (5 couleurs, du commun "Jaune" à l'extrêmement rare "Noir") en faisant tourner les points d'intérêt. Une clé ouvre un coffre de la même couleur ; le minuteur d'ouverture dépend de la couleur (fixé côté jeu). Vous réglez ici uniquement la récompense obtenue une fois le coffre ouvert.</p>
+    <div class="form-card">${rows}</div>
+    <div class="form-actions"><button class="btn btn-primary" id="saveChestsBtn">Enregistrer</button></div>
+  </div>`;
+  document.getElementById('saveChestsBtn').onclick = ()=>{
+    const next = {};
+    CHEST_COLORS.forEach(c=>{
+      next[c] = {
+        xp: Number(document.getElementById(`f_chest_xp_${c}`).value)||0,
+        coins: Number(document.getElementById(`f_chest_coins_${c}`).value)||0,
+      };
+    });
+    data.chestRewards = next;
+    saveDraft();
+    const btn = document.getElementById('saveChestsBtn');
+    const label = btn.textContent; btn.textContent = 'Enregistré ✓';
+    setTimeout(()=>{ btn.textContent = label; }, 1400);
+  };
+}
+
 function renderAll(){ renderTabs(); renderMain(); }
 
 /* ============================= MERCHANTS ============================= */
@@ -913,6 +966,8 @@ function importData(file){
       const parsed = JSON.parse(reader.result);
       data = Object.assign(emptyData(), parsed);
       ['merchants','pois','events','missions','badges'].forEach(k=>{ if(!Array.isArray(data[k])) data[k]=[]; });
+      if(!data.chestRewards || typeof data.chestRewards!=='object') data.chestRewards = defaultChestRewards();
+      else CHEST_COLORS.forEach(c=>{ if(!data.chestRewards[c]) data.chestRewards[c] = defaultChestRewards()[c]; });
       editingMerchantId=editingPoiId=editingEventId=editingMissionId=editingBadgeId=null; newBadgeDraft=null;
       saveDraft(); renderAll();
       alert('Import réussi : '+data.merchants.length+' commerçant(s), '+data.pois.length+' POI, '+data.events.length+' évènement(s), '+data.missions.length+' mission(s), '+data.badges.length+' badge(s).');
@@ -929,6 +984,8 @@ async function fetchLiveDataOrEmpty(){
       const json = await res.json();
       if(json && typeof json==='object'){
         ['merchants','pois','events','missions','badges'].forEach(k=>{ if(!Array.isArray(json[k])) json[k]=[]; });
+        if(!json.chestRewards || typeof json.chestRewards!=='object') json.chestRewards = defaultChestRewards();
+        else CHEST_COLORS.forEach(c=>{ if(!json.chestRewards[c]) json.chestRewards[c] = defaultChestRewards()[c]; });
         return json;
       }
     }
@@ -1054,6 +1111,8 @@ async function boot(){
   data = loadDraft();
   if(!data){ data = await fetchLiveDataOrEmpty(); }
   ['merchants','pois','events','missions','badges'].forEach(k=>{ if(!Array.isArray(data[k])) data[k]=[]; });
+  if(!data.chestRewards || typeof data.chestRewards!=='object') data.chestRewards = defaultChestRewards();
+  else CHEST_COLORS.forEach(c=>{ if(!data.chestRewards[c]) data.chestRewards[c] = defaultChestRewards()[c]; });
   document.getElementById('exportBtn').onclick = exportData;
   document.getElementById('importBtn').onclick = ()=> document.getElementById('importInput').click();
   document.getElementById('importInput').onchange = (e)=>{ const f=e.target.files[0]; if(f) importData(f); e.target.value=''; };

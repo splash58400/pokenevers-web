@@ -29,6 +29,7 @@
   --green:#2fa25f; --green-100:#daf5e4;
   --rarity-commun:#5e8db3; --rarity-peu:#22a06b; --rarity-rare:#7c5ce8; --rarity-legendaire:#eab545;
   --rarity-commun-2:#8fb6d6; --rarity-peu-2:#57cf9a; --rarity-rare-2:#a891ff; --rarity-legendaire-2:#ffd873;
+  --chest-jaune:#dcae00; --chest-vert:#2f9e52; --chest-bleu:#2f6fe0; --chest-violet:#8b5cf6; --chest-noir:#23262b;
   --shadow-sm:0 2px 8px rgba(18,42,79,.12);
   --shadow-md:0 8px 20px rgba(18,42,79,.16);
   --shadow-lg:0 16px 40px rgba(18,42,79,.22);
@@ -50,6 +51,7 @@
     --green:#5fce88; --green-100:#0f3322;
     --rarity-commun:#8fb0d4; --rarity-peu:#4fd393; --rarity-rare:#b09bff; --rarity-legendaire:#eec677;
     --rarity-commun-2:#b7d1ec; --rarity-peu-2:#8bf0c3; --rarity-rare-2:#d3c4ff; --rarity-legendaire-2:#ffe19a;
+    --chest-jaune:#f4cf4a; --chest-vert:#4fd382; --chest-bleu:#6ea8ff; --chest-violet:#b09bff; --chest-noir:#5b6472;
     --shadow-sm:0 2px 10px rgba(0,0,0,.4);
     --shadow-md:0 10px 24px rgba(0,0,0,.45);
     --shadow-lg:0 18px 44px rgba(0,0,0,.55);
@@ -362,6 +364,42 @@ input.text-input:focus{outline:none; border-color:var(--blue-600);}
 .badge-item.earned .badge-circle-lg svg{stroke:#3a2a08;}
 .badge-item span{font-size:9px; font-weight:800; text-align:center;}
 
+/* ---------- inventaire (clés & coffres) ---------- */
+.key-row{display:grid; grid-template-columns:repeat(5,1fr); gap:8px;}
+.key-chip{
+  display:flex; flex-direction:column; align-items:center; gap:2px;
+  background:var(--surface); border:1.5px solid color-mix(in srgb, var(--cc) 55%, var(--line));
+  border-radius:var(--radius-sm); padding:10px 4px 8px 4px; box-shadow:var(--shadow-sm);
+}
+.key-chip-icon{width:26px;height:26px;border-radius:50%; background:color-mix(in srgb, var(--cc) 20%, var(--surface-alt)); display:flex; align-items:center; justify-content:center;}
+.key-chip-icon svg{width:15px;height:15px; stroke:var(--cc);}
+.key-chip-count{font-family:"Fredoka"; font-size:15px; margin-top:2px;}
+.key-chip-label{font-size:8.5px; font-weight:800; text-transform:uppercase; letter-spacing:.03em; color:var(--ink-faint);}
+.chest-opening-card{
+  display:flex; align-items:center; gap:12px; margin-top:14px;
+  background:linear-gradient(135deg, color-mix(in srgb, var(--cc) 14%, var(--surface)), var(--surface) 70%);
+  border:1.5px solid color-mix(in srgb, var(--cc) 55%, var(--line));
+  border-radius:var(--radius-md); padding:12px 14px; box-shadow:var(--shadow-sm);
+}
+.chest-opening-card.ready{border-color:var(--gold); box-shadow:var(--shadow-md);}
+.chest-opening-icon{width:42px;height:42px;border-radius:50%; flex:none; background:color-mix(in srgb, var(--cc) 22%, var(--surface-alt)); display:flex; align-items:center; justify-content:center;}
+.chest-opening-icon svg{width:22px;height:22px; stroke:var(--cc);}
+.chest-opening-info{flex:1; display:flex; flex-direction:column; gap:2px;}
+.chest-opening-info strong{font-family:"Fredoka"; font-size:14px;}
+.chest-opening-info span{font-size:11.5px; color:var(--ink-soft); font-weight:700;}
+.chest-opening-card .btn{width:auto; padding:9px 16px; font-size:13px;}
+.chest-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(120px,1fr)); gap:10px;}
+.chest-card{
+  display:flex; flex-direction:column; align-items:center; gap:6px; text-align:center;
+  background:linear-gradient(165deg, var(--surface), color-mix(in srgb, var(--cc) 8%, var(--surface)));
+  border:1px solid color-mix(in srgb, var(--cc) 40%, var(--line)); border-radius:var(--radius-md);
+  padding:12px 8px 10px 8px; box-shadow:var(--shadow-sm);
+}
+.chest-card-icon{width:46px;height:46px;border-radius:50%; background:color-mix(in srgb, var(--cc) 20%, var(--surface-alt)); display:flex; align-items:center; justify-content:center; box-shadow:0 3px 10px color-mix(in srgb, var(--cc) 30%, transparent);}
+.chest-card-icon svg{width:24px;height:24px; stroke:var(--cc);}
+.chest-card-label{font-size:11.5px; font-weight:800;}
+.chest-card .btn{font-size:11px; padding:8px 6px;}
+
 .info-note{font-size:11.5px; color:var(--ink-faint); font-weight:700; line-height:1.5; background:var(--surface-alt); border-radius:var(--radius-sm); padding:10px 12px; margin-top:14px;}
 </style>
 </head>
@@ -383,6 +421,7 @@ input.text-input:focus{outline:none; border-color:var(--blue-600);}
   <div id="dexScreen" class="screen" style="display:none;"></div>
   <div id="eventsScreen" class="screen" style="display:none;"></div>
   <div id="missionsScreen" class="screen" style="display:none;"></div>
+  <div id="inventoryScreen" class="screen" style="display:none;"></div>
   <div id="profileScreen" class="screen" style="display:none;"></div>
 
   <div id="tabbar"></div>
@@ -419,7 +458,9 @@ const ICONS = {
   trophy:'<path d="M7 4h10v4a5 5 0 0 1-10 0V4Z"/><path d="M7 5H4v2a3 3 0 0 0 3 3M17 5h3v2a3 3 0 0 1-3 3"/><path d="M12 13v3M9 20h6M10 16.5h4v3.5h-4z"/>',
   person:'<circle cx="12" cy="8.5" r="3.6"/><path d="M4.5 20c1.2-4 4-6 7.5-6s6.3 2 7.5 6"/>',
   locate:'<circle cx="12" cy="12" r="2.6"/><path d="M12 2v3.4M12 18.6V22M2 12h3.4M18.6 12H22" stroke-linecap="round"/>',
-  flag:'<path d="M6 3v18"/><path d="M6 4h11l-2.5 3.5L17 11H6"/>'
+  flag:'<path d="M6 3v18"/><path d="M6 4h11l-2.5 3.5L17 11H6"/>',
+  key:'<circle cx="7.5" cy="7.5" r="3.5"/><path d="M10 10 19.5 19.5" stroke-linecap="round"/><path d="M15.5 15 17.7 12.8M18 17.5 20.2 15.3" stroke-linecap="round"/>',
+  chest:'<rect x="4" y="10.5" width="16" height="8.5" rx="1.4"/><path d="M4 10.5a8 4.3 0 0 1 16 0"/><rect x="10.4" y="12.7" width="3.2" height="3.2" rx="0.6"/>'
 };
 function icon(name, extra){ return `<svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" ${extra||''}>${ICONS[name]||ICONS.star}</svg>`; }
 
@@ -449,6 +490,50 @@ const RARITY_XP_LOSS = {commun:10, 'peu-commun':18, rare:30, legendaire:60};
 // Un nouveau dresseur démarre avec un petit capital d'XP, pour ne pas se retrouver bloqué dès
 // la toute première capture (voir defaultState()).
 const STARTING_XP = 20;
+
+/* ============================= CLÉS & COFFRES ============================= */
+// Trouvailles rares aux points d'intérêt (voir spinPoi) : une clé d'une couleur ouvre un coffre
+// de la même couleur. Une seule ouverture de coffre à la fois (choix de Jérémy), le minuteur
+// dépend de la couleur — du commun (Jaune) à l'extrêmement rare (Noir).
+const CHEST_COLORS = ['jaune','vert','bleu','violet','noir'];
+const CHEST_COLOR_LABEL = {jaune:'Jaune', vert:'Vert', bleu:'Bleu', violet:'Violet', noir:'Noir'};
+const CHEST_OPEN_MS = {
+  jaune: 30*60*1000,
+  vert: 60*60*1000,
+  bleu: 90*60*1000,
+  violet: 120*60*1000,
+  noir: 12*60*60*1000,
+};
+// Poids relatifs utilisés pour tirer la couleur d'une trouvaille (clé ou coffre) — du plus
+// courant (Jaune) au plus rare (Noir), même logique que RARITY_CATCH pour les commerçants.
+const CHEST_DROP_WEIGHTS = {jaune:50, vert:27, bleu:14, violet:7, noir:2};
+// Probabilité, à chaque point d'intérêt actionné (spinPoi), de trouver une clé et/ou un coffre —
+// indépendamment l'une de l'autre, en plus de la récompense XP/tampons habituelle du POI.
+const CHEST_FIND_CHANCE = {key:0.09, chest:0.05};
+// Récompense par défaut à l'ouverture d'un coffre (XP + tampons) — réglable depuis le panel
+// admin (gamedata.chestRewards), ces valeurs ne servent que si aucune configuration n'est
+// encore déployée ou si une couleur manque dans le fichier.
+const DEFAULT_CHEST_REWARDS = {
+  jaune:{xp:40, coins:20}, vert:{xp:80, coins:40}, bleu:{xp:150, coins:70},
+  violet:{xp:300, coins:130}, noir:{xp:900, coins:400},
+};
+let ACTIVE_CHEST_REWARDS = DEFAULT_CHEST_REWARDS;
+function pickChestColor(){
+  const total = CHEST_COLORS.reduce((a,c)=>a+CHEST_DROP_WEIGHTS[c],0);
+  let r = Math.random()*total;
+  for(const c of CHEST_COLORS){ r -= CHEST_DROP_WEIGHTS[c]; if(r<=0) return c; }
+  return CHEST_COLORS[0];
+}
+function fmtDuration(ms){
+  ms = Math.max(0, ms);
+  const totalSec = Math.ceil(ms/1000);
+  const h = Math.floor(totalSec/3600);
+  const m = Math.floor((totalSec%3600)/60);
+  const s = totalSec%60;
+  if(h>0) return `${h} h ${String(m).padStart(2,'0')} min`;
+  if(m>0) return `${m} min ${String(s).padStart(2,'0')} s`;
+  return `${s} s`;
+}
 
 const SPECIES = [
   { id:'boulangerie', icon:'bread', rarity:'commun',
@@ -565,6 +650,9 @@ function defaultState(){
     captureCooldowns:{},
     missionsCompleted:{},
     battleCooldowns:{},
+    keys:{jaune:0, vert:0, bleu:0, violet:0, noir:0},
+    chests:[], // {id, color, foundAt}
+    chestOpening:null, // {chestId, color, startedAt, readyAt, notified}
     seenIntro:false,
     spawns:null, // generated once, persisted
   };
@@ -810,10 +898,30 @@ function spinPoi(p,i){
   const xpGain = Math.round((p.rewardXp!=null?p.rewardXp:15)*mult);
   state.coins += gained;
   state.xp += xpGain;
+  const findMsgs = rollChestDrop();
   saveLocal();
   renderStatusBar();
-  showToast(`${p.name} : +${gained} tampons, +${xpGain} XP !`);
+  if(activeView==='inventory') renderInventory();
+  let msg = `${p.name} : +${gained} tampons, +${xpGain} XP !`;
+  if(findMsgs.length) msg += ' ' + findMsgs.join(' ');
+  showToast(msg);
   checkMissions();
+}
+// Trouvailles rares à un point d'intérêt : une clé et un coffre sont tirés indépendamment
+// (voir CHEST_FIND_CHANCE), chacun avec une couleur pondérée par CHEST_DROP_WEIGHTS.
+function rollChestDrop(){
+  const msgs = [];
+  if(Math.random() < CHEST_FIND_CHANCE.key){
+    const color = pickChestColor();
+    state.keys[color] = (state.keys[color]||0) + 1;
+    msgs.push(`🔑 Clé ${CHEST_COLOR_LABEL[color]} trouvée !`);
+  }
+  if(Math.random() < CHEST_FIND_CHANCE.chest){
+    const color = pickChestColor();
+    state.chests.push({ id: 'chest_'+Date.now().toString(36)+Math.random().toString(36).slice(2,7), color, foundAt: Date.now() });
+    msgs.push(`🧰 Coffre ${CHEST_COLOR_LABEL[color]} trouvé !`);
+  }
+  return msgs;
 }
 
 /* ============================= GEO ============================= */
@@ -1304,6 +1412,14 @@ function applyGameData(){
       desc:ev.description||'', bonus:ev.bonusLabel||'', bonusType:ev.bonusType||'none', bonusSpeciesId:ev.bonusSpeciesId||''
     }));
   }
+  if(gameData.chestRewards && typeof gameData.chestRewards==='object'){
+    const merged = {};
+    CHEST_COLORS.forEach(c=>{
+      const d = DEFAULT_CHEST_REWARDS[c], g = gameData.chestRewards[c]||{};
+      merged[c] = { xp: g.xp!=null?g.xp:d.xp, coins: g.coins!=null?g.coins:d.coins };
+    });
+    ACTIVE_CHEST_REWARDS = merged;
+  }
   ACTIVE_MISSIONS = (gameData.missions||[]).filter(mi=> mi.active!==false);
   const liveBadges = (gameData.badges||[]).filter(b=> b.active!==false);
   if(liveBadges.length){
@@ -1376,6 +1492,95 @@ function renderMissions(){
   el.innerHTML = `<h1>Missions</h1><p class="sub">Objectifs à accomplir en ville</p>${cards}`;
 }
 
+/* ============================= INVENTAIRE (clés & coffres) ============================= */
+function renderInventory(){
+  const el = document.getElementById('inventoryScreen');
+  if(!el) return;
+  const opening = state.chestOpening;
+
+  // Notification unique dès qu'un coffre en cours d'ouverture devient prêt.
+  if(opening && !opening.notified && Date.now() >= opening.readyAt){
+    opening.notified = true;
+    saveLocal();
+    showToast(`Le coffre ${CHEST_COLOR_LABEL[opening.color]} est prêt à être ouvert !`);
+  }
+
+  const keysHtml = CHEST_COLORS.map(c=>{
+    const n = state.keys[c]||0;
+    return `<div class="key-chip" style="--cc:var(--chest-${c});">
+      <div class="key-chip-icon">${icon('key')}</div>
+      <div class="key-chip-count">${n}</div>
+      <div class="key-chip-label">${CHEST_COLOR_LABEL[c]}</div>
+    </div>`;
+  }).join('');
+
+  let openingHtml = '';
+  if(opening){
+    const remain = opening.readyAt - Date.now();
+    const ready = remain<=0;
+    openingHtml = `<div class="chest-opening-card ${ready?'ready':''}" style="--cc:var(--chest-${opening.color});">
+      <div class="chest-opening-icon">${icon('chest')}</div>
+      <div class="chest-opening-info">
+        <strong>Coffre ${CHEST_COLOR_LABEL[opening.color]} ${ready?'prêt !':'en cours…'}</strong>
+        <span>${ready?'Appuyez pour récupérer votre butin.':fmtDuration(remain)+' restantes'}</span>
+      </div>
+      ${ready?`<button class="btn btn-gold" id="collectChestBtn">Ouvrir</button>`:''}
+    </div>`;
+  }
+
+  const shownChests = state.chests.filter(c=> !opening || c.id!==opening.chestId);
+  const chestsHtml = shownChests.length ? `<div class="chest-grid">${shownChests.map(c=>{
+    const hasKey = (state.keys[c.color]||0) > 0;
+    const canOpen = !opening && hasKey;
+    const label = opening ? 'Occupé' : (hasKey ? 'Ouvrir avec une clé' : 'Clé requise');
+    return `<div class="chest-card" style="--cc:var(--chest-${c.color});">
+      <div class="chest-card-icon">${icon('chest')}</div>
+      <div class="chest-card-label">Coffre ${CHEST_COLOR_LABEL[c.color]}</div>
+      <button class="btn ${canOpen?'btn-primary':'btn-ghost'} chest-open-btn" data-id="${c.id}" ${canOpen?'':'disabled'} style="margin-top:8px;">${label}</button>
+    </div>`;
+  }).join('')}</div>` : `<p class="sub" style="margin-top:2px;">Aucun coffre pour l'instant — les points d'intérêt en font parfois trouver.</p>`;
+
+  el.innerHTML = `<h1>Inventaire</h1><p class="sub">Clés et coffres trouvés aux points d'intérêt</p>
+    <h2 style="font-size:14px;margin:4px 0 10px 0;">Clés</h2>
+    <div class="key-row">${keysHtml}</div>
+    ${openingHtml}
+    <h2 style="font-size:14px;margin:18px 0 10px 0;">Coffres</h2>
+    ${chestsHtml}
+    <div class="info-note" style="margin-top:18px;">Un seul coffre peut être ouvert à la fois. Lancer l'ouverture consomme une clé de la même couleur ; le minuteur va de 30 min (Jaune) à 12 h (Noir).</div>`;
+
+  const collectBtn = document.getElementById('collectChestBtn');
+  if(collectBtn) collectBtn.onclick = collectChest;
+  el.querySelectorAll('.chest-open-btn').forEach(btn=>{
+    if(!btn.disabled) btn.addEventListener('click', ()=> startChestOpen(btn.dataset.id));
+  });
+}
+function startChestOpen(chestId){
+  if(state.chestOpening){ showToast('Un coffre est déjà en cours d’ouverture.'); return; }
+  const chest = state.chests.find(c=>c.id===chestId);
+  if(!chest) return;
+  const color = chest.color;
+  if(!((state.keys[color]||0) > 0)){ showToast(`Il vous faut une clé ${CHEST_COLOR_LABEL[color]} pour ouvrir ce coffre.`); return; }
+  state.keys[color] -= 1;
+  state.chestOpening = { chestId, color, startedAt: Date.now(), readyAt: Date.now()+CHEST_OPEN_MS[color], notified:false };
+  saveLocal();
+  renderInventory();
+  showToast(`Ouverture du coffre ${CHEST_COLOR_LABEL[color]} lancée (${fmtDuration(CHEST_OPEN_MS[color])}).`);
+}
+function collectChest(){
+  const opening = state.chestOpening;
+  if(!opening || Date.now() < opening.readyAt) return;
+  const reward = ACTIVE_CHEST_REWARDS[opening.color] || DEFAULT_CHEST_REWARDS[opening.color];
+  state.xp += reward.xp;
+  state.coins += reward.coins;
+  state.chests = state.chests.filter(c=>c.id!==opening.chestId);
+  state.chestOpening = null;
+  saveLocal();
+  renderStatusBar();
+  renderInventory();
+  showToast(`Coffre ${CHEST_COLOR_LABEL[opening.color]} ouvert ! +${reward.xp} XP, +${reward.coins} tampons.`);
+  checkMissions();
+}
+
 function renderProfile(){
   const el = document.getElementById('profileScreen');
   const lvl = levelFromXp(state.xp);
@@ -1412,6 +1617,7 @@ const TABS = [
   {id:'dex', label:'Commerçants', icon:'basket'},
   {id:'events', label:'Évènements', icon:'star'},
   {id:'missions', label:'Missions', icon:'flag'},
+  {id:'inventory', label:'Inventaire', icon:'chest'},
   {id:'profile', label:'Profil', icon:'person'},
 ];
 let activeView='map';
@@ -1427,10 +1633,12 @@ function switchView(v){
   document.getElementById('dexScreen').style.display = v==='dex'?'block':'none';
   document.getElementById('eventsScreen').style.display = v==='events'?'block':'none';
   document.getElementById('missionsScreen').style.display = v==='missions'?'block':'none';
+  document.getElementById('inventoryScreen').style.display = v==='inventory'?'block':'none';
   document.getElementById('profileScreen').style.display = v==='profile'?'block':'none';
   if(v==='dex') renderDex();
   if(v==='events') renderEvents();
   if(v==='missions') renderMissions();
+  if(v==='inventory') renderInventory();
   if(v==='profile') renderProfile();
   renderTabbar();
   if(v==='map' && map) setTimeout(()=> map.invalidateSize(), 60);
@@ -1475,6 +1683,10 @@ async function boot(){
   state.captureCooldowns = state.captureCooldowns || {};
   state.missionsCompleted = state.missionsCompleted || {};
   state.battleCooldowns = state.battleCooldowns || {};
+  state.keys = state.keys || {jaune:0, vert:0, bleu:0, violet:0, noir:0};
+  CHEST_COLORS.forEach(c=>{ if(state.keys[c]==null) state.keys[c]=0; });
+  state.chests = state.chests || [];
+  state.chestOpening = state.chestOpening || null;
   await loadGameData();
   applyGameData();
   initMap();
@@ -1485,6 +1697,9 @@ async function boot(){
   if('serviceWorker' in navigator){
     navigator.serviceWorker.register('sw.js').catch(()=>{});
   }
+  // Rafraîchit le compte à rebours de l'onglet Inventaire pendant qu'il est affiché,
+  // sans rien faire le reste du temps (léger, une fois par seconde).
+  setInterval(()=>{ if(activeView==='inventory') renderInventory(); }, 1000);
 }
 document.addEventListener('DOMContentLoaded', boot);
 
