@@ -41,6 +41,18 @@ self.addEventListener('fetch', (e) => {
   const isShell = url.origin === self.location.origin;
   if (!isShell) return; // let tiles/fonts hit the network normally
 
+  // /load-progress renvoie la sauvegarde LIVE associée à un code de synchronisation —
+  // ce n'est jamais un asset figé. Si on le laissait tomber dans la stratégie "cache
+  // d'abord" ci-dessous (comme un fichier générique), la toute première réponse resterait
+  // servie pour toujours à chaque appel suivant avec le même code, même après une nouvelle
+  // sauvegarde côté serveur — l'en-tête "cache-control: no-store" du Worker ne change rien
+  // ici car le Cache Storage du service worker ne consulte pas les en-têtes HTTP, seul le
+  // code ci-dessous décide quoi mettre en cache. Donc : jamais de cache pour cette route.
+  if (url.pathname === '/load-progress') {
+    e.respondWith(fetch(e.request));
+    return;
+  }
+
   if (isHtmlRequest(e.request, url) || url.pathname.endsWith('/gamedata.json')) {
     e.respondWith(
       fetch(e.request)

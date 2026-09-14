@@ -13,6 +13,11 @@
 //                                code secret de chaque commerçant ne doit
 //                                JAMAIS être envoyé au navigateur du joueur,
 //                                c'est tout l'intérêt de le vérifier ici).
+//  - POST /save-progress      : sauvegarde la progression d'un joueur sous
+//                                un code de récupération (voir plus bas).
+//  - GET  /load-progress      : récupère une progression à partir de son
+//                                code, pour la restaurer sur un autre
+//                                appareil.
 "use strict";
 
 import { readGamedata, writeGamedata } from "./lib/kv-store.js";
@@ -171,6 +176,76 @@ async function handleVerifyBattle(request, env) {
   }, { "cache-control": "no-store" });
 }
 
+// ---------------------------------------------------------------------------
+// Sauvegarde multi-appareils par code (alternative légère à un vrai compte
+// Google : Jérémy ne voulait pas encore mettre en place le client OAuth
+// nécessaire sur Google Cloud Console, voir la conversation). Le joueur
+// obtient un code de récupération (généré côté navigateur, voir index.html)
+// qui sert de clé dans Workers KV pour retrouver sa progression sur un autre
+// appareil. C'est un simple secret partagé — comme les codes de combat —
+// pas une vraie authentification : quiconque connaît le code peut lire ou
+// écraser cette sauvegarde. Adapté à la taille du projet, mais à garder en
+// tête si le jeu grandit (voir "Prochaines étapes" du suivi de projet).
+const SAVE_CODE_RE = /^[A-Z0-9]{5}-[A-Z0-9]{5}$/;
+const MAX_PROGRESS_BYTES = 40000; // largement au-dessus d'une sauvegarde réelle (quelques Ko)
+
+async function handleSaveProgress(request, env) {
+  if (!env.POKENEVERS_KV) {
+    return json(500, { error: "La liaison KV « POKENEVERS_KV » n'est pas configurée." });
+  }
+  let body;
+  try {
+    body = await request.json();
+  } catch (err) {
+    return json(400, { error: "JSON invalide." });
+  }
+  const code = typeof body.code === "string" ? body.code.trim().toUpperCase() : "";
+  if (!SAVE_CODE_RE.test(code)) {
+    return json(400, { error: "Format de code invalide." });
+  }
+  if (!body.state || typeof body.state !== "object" || Array.isArray(body.state)) {
+    return json(400, { error: "Progression invalide." });
+  }
+  const serialized = JSON.stringify(body.state);
+  if (serialized.length > MAX_PROGRESS_BYTES) {
+    return json(413, { error: "Progression trop volumineuse." });
+  }
+  try {
+    await env.POKENEVERS_KV.put(
+      "progress:" + code,
+      JSON.stringify({ state: body.state, updatedAt: new Date().toISOString() })
+    );
+  } catch (err) {
+    return json(500, { error: "Échec de l'enregistrement côté serveur." });
+  }
+  return json(200, { ok: true });
+}
+
+async function handleLoadProgress(request, env) {
+  if (!env.POKENEVERS_KV) {
+    return json(500, { error: "La liaison KV « POKENEVERS_KV » n'est pas configurée." });
+  }
+  const url = new URL(request.url);
+  const code = (url.searchParams.get("code") || "").trim().toUpperCase();
+  if (!SAVE_CODE_RE.test(code)) {
+    return json(400, { error: "Format de code invalide." });
+  }
+  let raw;
+  try {
+    raw = await env.POKENEVERS_KV.get("progress:" + code);
+  } catch (err) {
+    return json(500, { error: "Lecture impossible côté serveur." });
+  }
+  if (!raw) return json(404, { error: "Aucune sauvegarde ne correspond à ce code." });
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (err) {
+    return json(500, { error: "Sauvegarde corrompue." });
+  }
+  return json(200, { ok: true, state: parsed.state, updatedAt: parsed.updatedAt }, { "cache-control": "no-store" });
+}
+
 async function handleVerifyPassword(request, env) {
   const adminPassword = env.ADMIN_PASSWORD;
   if (!adminPassword) {
@@ -247,6 +322,12 @@ export default {
     }
     if (url.pathname === "/verify-battle-code" && request.method === "POST") {
       return handleVerifyBattle(request, env);
+    }
+    if (url.pathname === "/save-progress" && request.method === "POST") {
+      return handleSaveProgress(request, env);
+    }
+    if (url.pathname === "/load-progress" && request.method === "GET") {
+      return handleLoadProgress(request, env);
     }
 
     // Toute autre requête : fichiers statiques (index.html, admin.html, etc.)

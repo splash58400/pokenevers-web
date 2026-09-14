@@ -655,6 +655,7 @@ function defaultState(){
     chestOpening:null, // {chestId, color, startedAt, readyAt, notified}
     seenIntro:false,
     spawns:null, // generated once, persisted
+    syncCode:null, // code de récupération multi-appareils (voir SYNC ci-dessous), null = pas encore créé
   };
 }
 function loadLocal(){
@@ -663,6 +664,65 @@ function loadLocal(){
 }
 function saveLocal(){
   try{ localStorage.setItem('pokenevers_save_v1', JSON.stringify(state)); }catch(e){}
+  queueSync();
+}
+
+/* ============================= SAUVEGARDE MULTI-APPAREILS (code) ============================= */
+// Alternative sans compte Google (dont la mise en place — client OAuth sur Google Cloud
+// Console — a été mise de côté pour l'instant) : un code de récupération, généré sur
+// l'appareil, sert de clé pour retrouver sa progression ailleurs. C'est un secret partagé,
+// pas une vraie authentification — même logique que les codes de combat (voir Version 12) :
+// quiconque connaît le code peut lire/écraser cette sauvegarde. Suffisant pour ce projet.
+const SYNC_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // sans 0/O ni 1/I, pour éviter les confusions à la recopie
+function genSyncCode(){
+  const part = ()=>{ let s=''; for(let i=0;i<5;i++) s+=SYNC_CODE_ALPHABET[Math.floor(Math.random()*SYNC_CODE_ALPHABET.length)]; return s; };
+  return part()+'-'+part();
+}
+let syncTimer=null, syncInFlight=false, lastSyncError=null;
+// Poussée automatique et discrète vers le serveur à chaque sauvegarde locale, tant qu'un
+// code de récupération existe sur cet appareil — débattue (2.5 s) pour ne pas spammer le
+// serveur pendant une rafale de changements (capture, XP, coffres...). Échec silencieux :
+// hors-ligne est un cas courant pour un jeu de géolocalisation, ce n'est pas une erreur à
+// remonter au joueur à chaque fois (voir syncNow pour les actions explicites, elles).
+function queueSync(){
+  if(!state.syncCode) return;
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(()=> syncNow().catch(()=>{}), 2500);
+}
+async function syncNow(){
+  if(!state.syncCode || syncInFlight) return {ok:false};
+  syncInFlight = true;
+  try{
+    const res = await fetch('/save-progress', {
+      method:'POST', headers:{'content-type':'application/json'},
+      body: JSON.stringify({ code: state.syncCode, state })
+    });
+    lastSyncError = res.ok ? null : ((await res.json().catch(()=>({}))).error || 'Échec de la synchronisation.');
+    return {ok:res.ok};
+  }catch(e){
+    lastSyncError = 'Hors-ligne : la sauvegarde sera retentée plus tard.';
+    return {ok:false};
+  }finally{
+    syncInFlight = false;
+  }
+}
+// Récupère une progression depuis un code et REMPLACE la progression locale (le code fait
+// autorité, comme demandé) — utilisé pour restaurer sur un nouvel appareil ou changer de code.
+async function restoreFromCode(code){
+  const clean = (code||'').trim().toUpperCase();
+  if(!clean) return {ok:false, error:'Code manquant.'};
+  try{
+    const res = await fetch('/load-progress?code='+encodeURIComponent(clean));
+    const json = await res.json().catch(()=>({}));
+    if(!res.ok) return {ok:false, error: json.error || 'Code introuvable.'};
+    const spawns = state.spawns; // conserver les positions de spawn déjà générées sur CET appareil
+    state = Object.assign(defaultState(), json.state||{}, { syncCode: clean, spawns });
+    saveLocal();
+    renderAll();
+    return {ok:true};
+  }catch(e){
+    return {ok:false, error:'Impossible de contacter le serveur.'};
+  }
 }
 
 let map=null, tileLayer=null, rangeCircle=null, playerLeafletMarker=null;
@@ -1139,7 +1199,7 @@ function renderDex(){
       <div class="stagepips">${pips}</div>
     </div>`;
   }).join('');
-  el.innerHTML = `<h1>Commerçants</h1><p class="sub">${caughtCount} / ${ACTIVE_MERCHANTS.length} découverts</p><div class="dex-grid">${cards}</div>`;
+  el.innerHTML = `<h1>Pokemerçants</h1><p class="sub">${caughtCount} / ${ACTIVE_MERCHANTS.length} découverts</p><div class="dex-grid">${cards}</div>`;
   el.querySelectorAll('.dex-card').forEach(c=> c.addEventListener('click', ()=> openDexDetail(c.dataset.sp)));
 }
 function openDexDetail(spId){
@@ -1592,20 +1652,68 @@ function renderProfile(){
   }).join('');
   el.innerHTML = `<h1>${escapeHtml(state.trainerName||'Dresseur')}</h1><p class="sub">Niveau ${lvl} · Nevers</p>
     <div style="background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-md);padding:4px 16px;box-shadow:var(--shadow-sm);">
-      <div class="profile-stat"><span>Commerçants découverts</span><strong>${totalCaught} / ${ACTIVE_MERCHANTS.length}</strong></div>
+      <div class="profile-stat"><span>Pokemerçants découverts</span><strong>${totalCaught} / ${ACTIVE_MERCHANTS.length}</strong></div>
       <div class="profile-stat"><span>Évolutions réalisées</span><strong>${totalEvolved}</strong></div>
       <div class="profile-stat"><span>XP total</span><strong>${state.xp}</strong></div>
       <div class="profile-stat"><span>Tampons en poche</span><strong>${state.coins}</strong></div>
     </div>
     <h2 style="font-size:16px;margin:22px 0 0 0;">Badges</h2>
     <div class="badge-grid">${badgeHtml}</div>
-    <div class="info-note">${usingLiveMerchants ? "Vrais commerçants de Nevers, vraie carte OpenStreetMap et vrai GPS. Progression enregistrée sur cet appareil uniquement pour l'instant." : "Version prototype : commerçants fictifs, mais vraie carte OpenStreetMap et vrai GPS. Progression enregistrée sur cet appareil uniquement pour l'instant. Un panel d'administration permet d'ajouter les vrais commerçants, POI et évènements."}</div>
+    <h2 style="font-size:16px;margin:22px 0 0 0;">Sauvegarde multi-appareils</h2>
+    <div style="background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-md);padding:14px 16px;box-shadow:var(--shadow-sm);">
+      ${state.syncCode ? `
+        <p style="font-size:12px;color:var(--ink-soft);font-weight:700;margin:0 0 8px 0;">Notez ce code pour retrouver votre progression sur un autre appareil :</p>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <code style="flex:1;font-family:'Fredoka';font-size:17px;letter-spacing:.04em;background:var(--surface-alt);border-radius:var(--radius-sm);padding:10px 12px;text-align:center;">${state.syncCode}</code>
+          <button class="btn btn-ghost" id="copySyncBtn" style="width:auto;padding:10px 14px;">Copier</button>
+        </div>
+        <p style="font-size:11px;color:var(--ink-faint);font-weight:700;margin:8px 0 0 0;">Sauvegardée automatiquement à chaque changement, dès que la connexion réseau le permet.</p>
+      ` : `
+        <p style="font-size:12px;color:var(--ink-soft);font-weight:700;margin:0 0 10px 0;">Créez un code pour retrouver votre progression si vous changez de téléphone.</p>
+        <button class="btn btn-primary" id="createSyncBtn">Créer un code de sauvegarde</button>
+      `}
+      <div style="margin-top:14px;border-top:1px solid var(--line);padding-top:12px;">
+        <p style="font-size:12px;color:var(--ink-soft);font-weight:700;margin:0 0 8px 0;">${state.syncCode ? "Changer d'appareil ou utiliser un autre code :" : 'Vous avez déjà un code ?'}</p>
+        <div style="display:flex;gap:8px;">
+          <input class="text-input" id="restoreCodeInput" placeholder="XXXXX-XXXXX" style="flex:1;text-transform:uppercase;">
+          <button class="btn btn-ghost" id="restoreSyncBtn" style="width:auto;padding:0 16px;">Restaurer</button>
+        </div>
+      </div>
+    </div>
+    <div class="info-note">${usingLiveMerchants ? "Vrais commerçants de Nevers, vraie carte OpenStreetMap et vrai GPS." : "Version prototype : commerçants fictifs, mais vraie carte OpenStreetMap et vrai GPS. Un panel d'administration permet d'ajouter les vrais commerçants, POI et évènements."} Sans code de sauvegarde, la progression reste uniquement sur cet appareil.</div>
     <button class="btn btn-ghost" id="resetBtn" style="margin-top:16px;">Réinitialiser ma progression</button>`;
+  const copyBtn = document.getElementById('copySyncBtn');
+  if(copyBtn) copyBtn.onclick = ()=>{
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(state.syncCode).then(()=> showToast('Code copié !')).catch(()=> showToast(state.syncCode));
+    } else showToast(state.syncCode);
+  };
+  const createBtn = document.getElementById('createSyncBtn');
+  if(createBtn) createBtn.onclick = async ()=>{
+    createBtn.disabled = true; createBtn.textContent = 'Création…';
+    state.syncCode = genSyncCode();
+    saveLocal();
+    const r = await syncNow();
+    if(!r.ok) showToast('Code créé, mais synchronisation impossible pour le moment (réessai automatique dès que le réseau revient).');
+    renderProfile();
+  };
+  const restoreBtn = document.getElementById('restoreSyncBtn');
+  if(restoreBtn) restoreBtn.onclick = async ()=>{
+    const input = document.getElementById('restoreCodeInput');
+    const code = (input.value||'').trim();
+    if(!code) return;
+    if(!confirm('Remplacer la progression de cet appareil par celle du code '+code.toUpperCase()+' ? Cette action est irréversible.')) return;
+    restoreBtn.disabled = true; const label = restoreBtn.textContent; restoreBtn.textContent = '…';
+    const r = await restoreFromCode(code);
+    if(!r.ok){ showToast(r.error || 'Restauration impossible.'); restoreBtn.disabled=false; restoreBtn.textContent=label; }
+    else showToast('Progression restaurée !');
+  };
   document.getElementById('resetBtn').onclick = ()=>{
     if(confirm('Réinitialiser toute la progression ?')){
       const name = state.trainerName;
       const spawns = state.spawns;
-      state = defaultState(); state.trainerName=name; state.seenIntro=true; state.spawns=spawns;
+      const syncCode = state.syncCode;
+      state = defaultState(); state.trainerName=name; state.seenIntro=true; state.spawns=spawns; state.syncCode=syncCode;
       saveLocal(); renderAll();
     }
   };
@@ -1614,7 +1722,7 @@ function renderProfile(){
 /* ============================= NAV ============================= */
 const TABS = [
   {id:'map', label:'Carte', icon:'map'},
-  {id:'dex', label:'Commerçants', icon:'basket'},
+  {id:'dex', label:'Pokemerçants', icon:'basket'},
   {id:'events', label:'Évènements', icon:'star'},
   {id:'missions', label:'Missions', icon:'flag'},
   {id:'inventory', label:'Inventaire', icon:'chest'},
@@ -1687,6 +1795,7 @@ async function boot(){
   CHEST_COLORS.forEach(c=>{ if(state.keys[c]==null) state.keys[c]=0; });
   state.chests = state.chests || [];
   state.chestOpening = state.chestOpening || null;
+  state.syncCode = state.syncCode || null;
   await loadGameData();
   applyGameData();
   initMap();
