@@ -255,8 +255,29 @@ function defaultChestRewards(){
     violet:{xp:300, coins:130}, noir:{xp:900, coins:400},
   };
 }
+// Boutique (Version 19) : prix par défaut, en tampons — mêmes valeurs que côté jeu
+// (public/index.html, DEFAULT_KEY_PRICES / DEFAULT_CHEST_SKIP_PRICES / DEFAULT_NOEUD_PRICE),
+// à garder synchronisées si l'une des deux est modifiée.
+function defaultShopConfig(){
+  return {
+    keyPrices: {jaune:20, vert:50, bleu:110, violet:240, noir:700},
+    chestSkipPrices: {jaune:15, vert:35, bleu:55, violet:90, noir:250},
+    noeudPrice: 8,
+  };
+}
+// Complète un objet de données (import, version en ligne, brouillon) avec un shopConfig valide,
+// même logique de "backfill" que pour chestRewards juste au-dessus/en-dessous.
+function ensureShopConfig(obj){
+  const d = defaultShopConfig();
+  if(!obj.shopConfig || typeof obj.shopConfig!=='object'){ obj.shopConfig = d; return; }
+  if(!obj.shopConfig.keyPrices || typeof obj.shopConfig.keyPrices!=='object') obj.shopConfig.keyPrices = d.keyPrices;
+  else CHEST_COLORS.forEach(c=>{ if(obj.shopConfig.keyPrices[c]==null) obj.shopConfig.keyPrices[c] = d.keyPrices[c]; });
+  if(!obj.shopConfig.chestSkipPrices || typeof obj.shopConfig.chestSkipPrices!=='object') obj.shopConfig.chestSkipPrices = d.chestSkipPrices;
+  else CHEST_COLORS.forEach(c=>{ if(obj.shopConfig.chestSkipPrices[c]==null) obj.shopConfig.chestSkipPrices[c] = d.chestSkipPrices[c]; });
+  if(obj.shopConfig.noeudPrice==null) obj.shopConfig.noeudPrice = d.noeudPrice;
+}
 function emptyData(){
-  return { version:1, updatedAt: nowIso(), merchants:[], pois:[], events:[], missions:[], badges:[], chestRewards: defaultChestRewards() };
+  return { version:1, updatedAt: nowIso(), merchants:[], pois:[], events:[], missions:[], badges:[], chestRewards: defaultChestRewards(), shopConfig: defaultShopConfig() };
 }
 let data = null;
 function loadDraft(){
@@ -368,6 +389,7 @@ const TABS = [
   {id:'missions', label:'Missions', icon:'flag'},
   {id:'badges', label:'Badges', icon:'medal'},
   {id:'chests', label:'Coffres', icon:'chest'},
+  {id:'shop', label:'Boutique', icon:'key'},
 ];
 let activeTab='merchants';
 let editingMerchantId=null, editingPoiId=null, editingEventId=null, editingMissionId=null, editingBadgeId=null;
@@ -454,6 +476,8 @@ function renderMain(){
     if(editingBadgeId) renderBadgeForm();
   } else if(activeTab==='chests'){
     renderChestsPanel();
+  } else if(activeTab==='shop'){
+    renderShopPanel();
   }
   if(activeTab==='merchants' || activeTab==='pois'){
     if(!mapContainerEl){ mapContainerEl = document.createElement('div'); mapContainerEl.id = 'adminMap'; }
@@ -498,6 +522,60 @@ function renderChestsPanel(){
     data.chestRewards = next;
     saveDraft();
     const btn = document.getElementById('saveChestsBtn');
+    const label = btn.textContent; btn.textContent = 'Enregistré ✓';
+    setTimeout(()=>{ btn.textContent = label; }, 1400);
+  };
+}
+
+/* ============================= BOUTIQUE ============================= */
+// Boutique (Version 19) : les joueurs dépensent leurs tampons dans l'onglet Inventaire pour
+// acheter des clés (prix par couleur), terminer immédiatement l'ouverture d'un coffre en cours
+// (prix par couleur) ou acheter directement des Nœuds Verts (prix unique). Les taux de trouvaille
+// de clés/coffres et le fonctionnement des Nœuds Verts restent fixés côté jeu ; seuls ces prix
+// sont réglables ici.
+function renderShopPanel(){
+  const main = document.getElementById('mainArea');
+  ensureShopConfig(data);
+  const keyRows = CHEST_COLORS.map(c=>{
+    return `<div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line);">
+      <span style="width:20px;height:20px;border-radius:50%;background:${CHEST_COLOR_SWATCH[c]};box-shadow:0 0 0 2px var(--line) inset;flex:none;"></span>
+      <div style="min-width:130px;flex:1;font-weight:800;">${CHEST_COLOR_LABEL[c]}</div>
+      <div class="field" style="flex:1;min-width:140px;"><label>Prix de la clé (tampons)</label><input type="number" min="0" id="f_shop_key_${c}" value="${data.shopConfig.keyPrices[c]}"></div>
+    </div>`;
+  }).join('');
+  const skipRows = CHEST_COLORS.map(c=>{
+    return `<div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line);">
+      <span style="width:20px;height:20px;border-radius:50%;background:${CHEST_COLOR_SWATCH[c]};box-shadow:0 0 0 2px var(--line) inset;flex:none;"></span>
+      <div style="min-width:130px;flex:1;font-weight:800;">${CHEST_COLOR_LABEL[c]}<span class="hint" style="display:block;font-weight:600;margin:2px 0 0 0;">Ouverture normale : ${CHEST_OPEN_LABEL[c]}</span></div>
+      <div class="field" style="flex:1;min-width:140px;"><label>Prix pour terminer immédiatement (tampons)</label><input type="number" min="0" id="f_shop_skip_${c}" value="${data.shopConfig.chestSkipPrices[c]}"></div>
+    </div>`;
+  }).join('');
+  main.innerHTML = `<div class="panel">
+    <h2>Boutique</h2>
+    <p class="hint">Dans l'onglet Inventaire du jeu, les joueurs peuvent dépenser leurs tampons pour acheter des clés, terminer immédiatement l'ouverture d'un coffre en cours, ou acheter directement des Nœuds Verts. Réglez ici les prix, en tampons.</p>
+    <h3 style="margin:18px 0 4px;">Clés</h3>
+    <div class="form-card">${keyRows}</div>
+    <h3 style="margin:18px 0 4px;">Terminer un coffre immédiatement</h3>
+    <div class="form-card">${skipRows}</div>
+    <h3 style="margin:18px 0 4px;">Nœuds Verts</h3>
+    <div class="form-card">
+      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:10px 0;">
+        <div style="min-width:130px;flex:1;font-weight:800;">Nœud Vert à l'unité</div>
+        <div class="field" style="flex:1;min-width:140px;"><label>Prix (tampons)</label><input type="number" min="0" id="f_shop_noeud" value="${data.shopConfig.noeudPrice}"></div>
+      </div>
+    </div>
+    <div class="form-actions"><button class="btn btn-primary" id="saveShopBtn">Enregistrer</button></div>
+  </div>`;
+  document.getElementById('saveShopBtn').onclick = ()=>{
+    const keyPrices = {}, chestSkipPrices = {};
+    CHEST_COLORS.forEach(c=>{
+      keyPrices[c] = Number(document.getElementById(`f_shop_key_${c}`).value)||0;
+      chestSkipPrices[c] = Number(document.getElementById(`f_shop_skip_${c}`).value)||0;
+    });
+    const noeudPrice = Number(document.getElementById('f_shop_noeud').value)||0;
+    data.shopConfig = { keyPrices, chestSkipPrices, noeudPrice };
+    saveDraft();
+    const btn = document.getElementById('saveShopBtn');
     const label = btn.textContent; btn.textContent = 'Enregistré ✓';
     setTimeout(()=>{ btn.textContent = label; }, 1400);
   };
@@ -977,6 +1055,7 @@ function importData(file){
       ['merchants','pois','events','missions','badges'].forEach(k=>{ if(!Array.isArray(data[k])) data[k]=[]; });
       if(!data.chestRewards || typeof data.chestRewards!=='object') data.chestRewards = defaultChestRewards();
       else CHEST_COLORS.forEach(c=>{ if(!data.chestRewards[c]) data.chestRewards[c] = defaultChestRewards()[c]; });
+      ensureShopConfig(data);
       editingMerchantId=editingPoiId=editingEventId=editingMissionId=editingBadgeId=null; newBadgeDraft=null;
       saveDraft(); renderAll();
       alert('Import réussi : '+data.merchants.length+' commerçant(s), '+data.pois.length+' POI, '+data.events.length+' évènement(s), '+data.missions.length+' mission(s), '+data.badges.length+' badge(s).');
@@ -995,6 +1074,7 @@ async function fetchLiveDataOrEmpty(){
         ['merchants','pois','events','missions','badges'].forEach(k=>{ if(!Array.isArray(json[k])) json[k]=[]; });
         if(!json.chestRewards || typeof json.chestRewards!=='object') json.chestRewards = defaultChestRewards();
         else CHEST_COLORS.forEach(c=>{ if(!json.chestRewards[c]) json.chestRewards[c] = defaultChestRewards()[c]; });
+        ensureShopConfig(json);
         return json;
       }
     }
@@ -1122,6 +1202,7 @@ async function boot(){
   ['merchants','pois','events','missions','badges'].forEach(k=>{ if(!Array.isArray(data[k])) data[k]=[]; });
   if(!data.chestRewards || typeof data.chestRewards!=='object') data.chestRewards = defaultChestRewards();
   else CHEST_COLORS.forEach(c=>{ if(!data.chestRewards[c]) data.chestRewards[c] = defaultChestRewards()[c]; });
+  ensureShopConfig(data);
   document.getElementById('exportBtn').onclick = exportData;
   document.getElementById('importBtn').onclick = ()=> document.getElementById('importInput').click();
   document.getElementById('importInput').onchange = (e)=>{ const f=e.target.files[0]; if(f) importData(f); e.target.value=''; };

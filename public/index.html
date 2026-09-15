@@ -400,6 +400,28 @@ input.text-input:focus{outline:none; border-color:var(--blue-600);}
 .chest-card-label{font-size:11.5px; font-weight:800;}
 .chest-card .btn{font-size:11px; padding:8px 6px;}
 
+/* ---------- boutique (Version 19) ---------- */
+.shop-key-card{
+  display:flex; flex-direction:column; align-items:center; gap:4px;
+  background:var(--surface); border:1.5px solid color-mix(in srgb, var(--cc) 55%, var(--line));
+  border-radius:var(--radius-sm); padding:10px 4px 8px 4px; box-shadow:var(--shadow-sm);
+}
+.shop-key-card .shop-key-price{font-size:9.5px; font-weight:800; color:var(--ink-faint);}
+.shop-key-card .btn{width:100%; font-size:10px; padding:6px 2px; margin-top:2px;}
+.shop-row-card{
+  display:flex; align-items:center; gap:12px; margin-top:10px;
+  background:linear-gradient(135deg, color-mix(in srgb, var(--cc) 14%, var(--surface)), var(--surface) 70%);
+  border:1.5px solid color-mix(in srgb, var(--cc) 55%, var(--line));
+  border-radius:var(--radius-md); padding:12px 14px; box-shadow:var(--shadow-sm);
+}
+.shop-row-icon{width:42px;height:42px;border-radius:50%; flex:none; background:color-mix(in srgb, var(--cc) 22%, var(--surface-alt)); display:flex; align-items:center; justify-content:center;}
+.shop-row-icon svg{width:22px;height:22px; stroke:var(--cc);}
+.shop-row-info{flex:1; display:flex; flex-direction:column; gap:2px;}
+.shop-row-info strong{font-family:"Fredoka"; font-size:14px;}
+.shop-row-info span{font-size:11.5px; color:var(--ink-soft); font-weight:700;}
+.shop-row-card .btn{width:auto; padding:9px 16px; font-size:13px; flex:none;}
+.shop-row-card .btn:disabled{opacity:.5;}
+
 .info-note{font-size:11.5px; color:var(--ink-faint); font-weight:700; line-height:1.5; background:var(--surface-alt); border-radius:var(--radius-sm); padding:10px 12px; margin-top:14px;}
 </style>
 </head>
@@ -536,6 +558,19 @@ const DEFAULT_CHEST_REWARDS = {
   violet:{xp:300, coins:130}, noir:{xp:900, coins:400},
 };
 let ACTIVE_CHEST_REWARDS = DEFAULT_CHEST_REWARDS;
+
+/* ============================= BOUTIQUE ============================= */
+// Les tampons n'avaient jusqu'ici aucune utilité (accumulés sans jamais être dépensés) —
+// signalé par Jérémy. La boutique leur donne enfin un usage : acheter des clés, terminer
+// immédiatement l'ouverture d'un coffre en cours, ou échanger des tampons contre des Nœuds
+// Verts. Prix par défaut ci-dessous, réglables depuis le panel admin (gamedata.shopConfig),
+// même principe que ACTIVE_CHEST_REWARDS juste au-dessus.
+const DEFAULT_KEY_PRICES = {jaune:20, vert:50, bleu:110, violet:240, noir:700};
+const DEFAULT_CHEST_SKIP_PRICES = {jaune:15, vert:35, bleu:55, violet:90, noir:250};
+const DEFAULT_NOEUD_PRICE = 8;
+let ACTIVE_KEY_PRICES = DEFAULT_KEY_PRICES;
+let ACTIVE_CHEST_SKIP_PRICES = DEFAULT_CHEST_SKIP_PRICES;
+let ACTIVE_NOEUD_PRICE = DEFAULT_NOEUD_PRICE;
 function pickChestColor(){
   const total = CHEST_COLORS.reduce((a,c)=>a+CHEST_DROP_WEIGHTS[c],0);
   let r = Math.random()*total;
@@ -1499,7 +1534,9 @@ function applyGameData(){
       name:p.name||"Point d'intérêt", icon:p.icon||'stall', lat:p.lat, lon:p.lon,
       rewardCoinsMin: p.rewardCoinsMin!=null?p.rewardCoinsMin:2,
       rewardCoinsMax: p.rewardCoinsMax!=null?p.rewardCoinsMax:4,
-      rewardXp: p.rewardXp!=null?p.rewardXp:15
+      rewardXp: p.rewardXp!=null?p.rewardXp:15,
+      rewardNoeudsMin: p.rewardNoeudsMin!=null?p.rewardNoeudsMin:1,
+      rewardNoeudsMax: p.rewardNoeudsMax!=null?p.rewardNoeudsMax:3
     }));
   }
   const liveEvents = (gameData.events||[]).filter(ev=> ev.active!==false && ev.start && ev.end);
@@ -1517,6 +1554,20 @@ function applyGameData(){
       merged[c] = { xp: g.xp!=null?g.xp:d.xp, coins: g.coins!=null?g.coins:d.coins };
     });
     ACTIVE_CHEST_REWARDS = merged;
+  }
+  if(gameData.shopConfig && typeof gameData.shopConfig==='object'){
+    const sc = gameData.shopConfig;
+    if(sc.keyPrices && typeof sc.keyPrices==='object'){
+      const merged = {};
+      CHEST_COLORS.forEach(c=>{ merged[c] = sc.keyPrices[c]!=null ? sc.keyPrices[c] : DEFAULT_KEY_PRICES[c]; });
+      ACTIVE_KEY_PRICES = merged;
+    }
+    if(sc.chestSkipPrices && typeof sc.chestSkipPrices==='object'){
+      const merged = {};
+      CHEST_COLORS.forEach(c=>{ merged[c] = sc.chestSkipPrices[c]!=null ? sc.chestSkipPrices[c] : DEFAULT_CHEST_SKIP_PRICES[c]; });
+      ACTIVE_CHEST_SKIP_PRICES = merged;
+    }
+    ACTIVE_NOEUD_PRICE = sc.noeudPrice!=null ? sc.noeudPrice : DEFAULT_NOEUD_PRICE;
   }
   ACTIVE_MISSIONS = (gameData.missions||[]).filter(mi=> mi.active!==false);
   const liveBadges = (gameData.badges||[]).filter(b=> b.active!==false);
@@ -1638,19 +1689,90 @@ function renderInventory(){
     </div>`;
   }).join('')}</div>` : `<p class="sub" style="margin-top:2px;">Aucun coffre pour l'instant — les points d'intérêt en font parfois trouver.</p>`;
 
+  // Boutique : clés à l'unité, fin immédiate d'une ouverture en cours, échange contre des Nœuds Verts.
+  const shopKeysHtml = CHEST_COLORS.map(c=>{
+    const price = ACTIVE_KEY_PRICES[c];
+    const afford = state.coins >= price;
+    return `<div class="shop-key-card" style="--cc:var(--chest-${c});">
+      <div class="key-chip-icon">${icon('key')}</div>
+      <div class="key-chip-label">${CHEST_COLOR_LABEL[c]}</div>
+      <div class="shop-key-price">${price} tampons</div>
+      <button class="btn ${afford?'btn-primary':'btn-ghost'} shop-buy-key-btn" data-color="${c}" ${afford?'':'disabled'}>Acheter</button>
+    </div>`;
+  }).join('');
+  let skipRowHtml = '';
+  if(opening && Date.now() < opening.readyAt){
+    const skipPrice = ACTIVE_CHEST_SKIP_PRICES[opening.color];
+    const afford = state.coins >= skipPrice;
+    skipRowHtml = `<div class="shop-row-card" style="--cc:var(--chest-${opening.color});">
+      <div class="shop-row-icon">${icon('chest')}</div>
+      <div class="shop-row-info"><strong>Terminer le coffre ${CHEST_COLOR_LABEL[opening.color]}</strong><span>Récupérez-le tout de suite, sans attendre.</span></div>
+      <button class="btn ${afford?'btn-gold':'btn-ghost'}" id="shopSkipChestBtn" ${afford?'':'disabled'}>${skipPrice} tampons</button>
+    </div>`;
+  }
+  const noeudAfford = state.coins >= ACTIVE_NOEUD_PRICE;
+  const noeudRowHtml = `<div class="shop-row-card" style="--cc:var(--green);">
+    <div class="shop-row-icon">${icon('noeud')}</div>
+    <div class="shop-row-info"><strong>1 Nœud Vert</strong><span>Vous en avez ${state.noeudsVerts} en poche.</span></div>
+    <button class="btn ${noeudAfford?'btn-primary':'btn-ghost'}" id="shopBuyNoeudBtn" ${noeudAfford?'':'disabled'}>${ACTIVE_NOEUD_PRICE} tampons</button>
+  </div>`;
+
   el.innerHTML = `<h1>Inventaire</h1><p class="sub">Clés et coffres trouvés aux points d'intérêt</p>
     <h2 style="font-size:14px;margin:4px 0 10px 0;">Clés</h2>
     <div class="key-row">${keysHtml}</div>
     ${openingHtml}
     <h2 style="font-size:14px;margin:18px 0 10px 0;">Coffres</h2>
     ${chestsHtml}
-    <div class="info-note" style="margin-top:18px;">Un seul coffre peut être ouvert à la fois. Lancer l'ouverture consomme une clé de la même couleur ; le minuteur va de 30 min (Jaune) à 12 h (Noir).</div>`;
+    <div class="info-note" style="margin-top:18px;">Un seul coffre peut être ouvert à la fois. Lancer l'ouverture consomme une clé de la même couleur ; le minuteur va de 30 min (Jaune) à 12 h (Noir).</div>
+    <h2 style="font-size:14px;margin:22px 0 10px 0;">Boutique <span style="font-weight:600;color:var(--ink-faint);">(contre des tampons)</span></h2>
+    <div class="key-row">${shopKeysHtml}</div>
+    ${skipRowHtml}
+    ${noeudRowHtml}`;
 
   const collectBtn = document.getElementById('collectChestBtn');
   if(collectBtn) collectBtn.onclick = collectChest;
   el.querySelectorAll('.chest-open-btn').forEach(btn=>{
     if(!btn.disabled) btn.addEventListener('click', ()=> startChestOpen(btn.dataset.id));
   });
+  el.querySelectorAll('.shop-buy-key-btn').forEach(btn=>{
+    if(!btn.disabled) btn.addEventListener('click', ()=> buyKey(btn.dataset.color));
+  });
+  const skipBtn = document.getElementById('shopSkipChestBtn');
+  if(skipBtn && !skipBtn.disabled) skipBtn.onclick = buySkipChest;
+  const noeudBtn = document.getElementById('shopBuyNoeudBtn');
+  if(noeudBtn && !noeudBtn.disabled) noeudBtn.onclick = buyNoeud;
+}
+function buyKey(color){
+  const price = ACTIVE_KEY_PRICES[color];
+  if(state.coins < price){ showToast(`Pas assez de tampons (il faut ${price}).`); return; }
+  state.coins -= price;
+  state.keys[color] = (state.keys[color]||0)+1;
+  saveLocal();
+  renderStatusBar();
+  renderInventory();
+  showToast(`Clé ${CHEST_COLOR_LABEL[color]} achetée (−${price} tampons).`);
+}
+function buySkipChest(){
+  const opening = state.chestOpening;
+  if(!opening || Date.now() >= opening.readyAt) return;
+  const price = ACTIVE_CHEST_SKIP_PRICES[opening.color];
+  if(state.coins < price){ showToast(`Pas assez de tampons (il faut ${price}).`); return; }
+  state.coins -= price;
+  opening.readyAt = Date.now();
+  saveLocal();
+  renderStatusBar();
+  renderInventory();
+  showToast(`Ouverture terminée immédiatement (−${price} tampons) !`);
+}
+function buyNoeud(){
+  const price = ACTIVE_NOEUD_PRICE;
+  if(state.coins < price){ showToast(`Pas assez de tampons (il faut ${price}).`); return; }
+  state.coins -= price;
+  state.noeudsVerts += 1;
+  saveLocal();
+  renderStatusBar();
+  renderInventory();
+  showToast(`+1 Nœud Vert (−${price} tampons) !`);
 }
 function startChestOpen(chestId){
   if(state.chestOpening){ showToast('Un coffre est déjà en cours d’ouverture.'); return; }
