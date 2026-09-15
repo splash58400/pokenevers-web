@@ -226,7 +226,8 @@ const ICONS = {
   trash:'<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" stroke-linecap="round" stroke-linejoin="round"/>',
   pin:'<path d="M12 21s7-6.5 7-12a7 7 0 0 0-14 0c0 5.5 7 12 7 12Z"/><circle cx="12" cy="9" r="2.4"/>',
   key:'<circle cx="7.5" cy="7.5" r="3.5"/><path d="M10 10 19.5 19.5" stroke-linecap="round"/><path d="M15.5 15 17.7 12.8M18 17.5 20.2 15.3" stroke-linecap="round"/>',
-  chest:'<rect x="4" y="10.5" width="16" height="8.5" rx="1.4"/><path d="M4 10.5a8 4.3 0 0 1 16 0"/><rect x="10.4" y="12.7" width="3.2" height="3.2" rx="0.6"/>'
+  chest:'<rect x="4" y="10.5" width="16" height="8.5" rx="1.4"/><path d="M4 10.5a8 4.3 0 0 1 16 0"/><rect x="10.4" y="12.7" width="3.2" height="3.2" rx="0.6"/>',
+  balloon:'<path d="M12 3.2c-3.4 0-6 2.9-6 6.4 0 3.9 3 7.4 5.2 8.9.5.3 1.1.3 1.6 0 2.2-1.5 5.2-5 5.2-8.9 0-3.5-2.6-6.4-6-6.4Z"/><path d="M12 18.5v2.3M10.7 21.3h2.6" stroke-linecap="round"/>'
 };
 function icon(name, extra){ return `<svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" ${extra||''}>${ICONS[name]||ICONS.star}</svg>`; }
 const ICON_OPTIONS = ['bread','cheese','wine','flower','chocolate','coffee','antique','vase','basket','book','cathedral','palace','gate','bridge','stall','star','trophy','compass','medal','flag','target','person','map','pin'];
@@ -296,8 +297,27 @@ function ensureDropConfig(obj){
   if(!obj.dropConfig.weights || typeof obj.dropConfig.weights!=='object') obj.dropConfig.weights = d.weights;
   else CHEST_COLORS.forEach(c=>{ if(obj.dropConfig.weights[c]==null) obj.dropConfig.weights[c] = d.weights[c]; });
 }
+// Ballons rouges éphémères (Version 21) : réglages d'apparition et de récompense — mêmes valeurs
+// que côté jeu (public/index.html, DEFAULT_BALLOON_CONFIG), à garder synchronisées si l'une des
+// deux est modifiée.
+function defaultBalloonConfig(){
+  return {
+    spawnIntervalMinMin: 4, spawnIntervalMaxMin: 10,
+    lifetimeMinutes: 8,
+    spawnRadiusMin: 30, spawnRadiusMax: 150,
+    maxActive: 1,
+    rewardCoinsMin: 5, rewardCoinsMax: 10, rewardXp: 25, rewardNoeudsMin: 1, rewardNoeudsMax: 2,
+  };
+}
+// Complète un objet de données avec un balloonConfig valide, même logique de "backfill" que pour
+// dropConfig/shopConfig/chestRewards ci-dessus.
+function ensureBalloonConfig(obj){
+  const d = defaultBalloonConfig();
+  if(!obj.balloonConfig || typeof obj.balloonConfig!=='object'){ obj.balloonConfig = d; return; }
+  Object.keys(d).forEach(k=>{ if(obj.balloonConfig[k]==null) obj.balloonConfig[k] = d[k]; });
+}
 function emptyData(){
-  return { version:1, updatedAt: nowIso(), merchants:[], pois:[], events:[], missions:[], badges:[], chestRewards: defaultChestRewards(), shopConfig: defaultShopConfig(), dropConfig: defaultDropConfig() };
+  return { version:1, updatedAt: nowIso(), merchants:[], pois:[], events:[], missions:[], badges:[], chestRewards: defaultChestRewards(), shopConfig: defaultShopConfig(), dropConfig: defaultDropConfig(), balloonConfig: defaultBalloonConfig() };
 }
 let data = null;
 function loadDraft(){
@@ -410,6 +430,7 @@ const TABS = [
   {id:'badges', label:'Badges', icon:'medal'},
   {id:'chests', label:'Coffres', icon:'chest'},
   {id:'shop', label:'Boutique', icon:'key'},
+  {id:'balloons', label:'Ballons', icon:'balloon'},
 ];
 let activeTab='merchants';
 let editingMerchantId=null, editingPoiId=null, editingEventId=null, editingMissionId=null, editingBadgeId=null;
@@ -498,6 +519,8 @@ function renderMain(){
     renderChestsPanel();
   } else if(activeTab==='shop'){
     renderShopPanel();
+  } else if(activeTab==='balloons'){
+    renderBalloonsPanel();
   }
   if(activeTab==='merchants' || activeTab==='pois'){
     if(!mapContainerEl){ mapContainerEl = document.createElement('div'); mapContainerEl.id = 'adminMap'; }
@@ -620,6 +643,61 @@ function renderShopPanel(){
     data.shopConfig = { keyPrices, chestSkipPrices, noeudPrice };
     saveDraft();
     const btn = document.getElementById('saveShopBtn');
+    const label = btn.textContent; btn.textContent = 'Enregistré ✓';
+    setTimeout(()=>{ btn.textContent = label; }, 1400);
+  };
+}
+
+// Ballons rouges éphémères (Version 21) : réglages d'apparition (fréquence, durée de vie, rayon
+// autour du joueur) et de récompense (tampons/exp/Nœud Vert) — voir defaultBalloonConfig().
+function renderBalloonsPanel(){
+  const main = document.getElementById('mainArea');
+  ensureBalloonConfig(data);
+  const bc = data.balloonConfig;
+  main.innerHTML = `<div class="panel">
+    <h2>Ballons</h2>
+    <p class="hint">Un ballon rouge apparaît de temps en temps près du joueur, sur la carte du jeu ; s'il n'est pas éclaté à temps, il disparaît tout seul. En cliquant dessus (à moins de 60 m, comme les autres éléments de la carte), il éclate et donne tampons, expérience et Nœud(s) Vert.</p>
+    <h3 style="margin:18px 0 4px;">Apparition</h3>
+    <div class="form-card">
+      <div style="display:flex;flex-wrap:wrap;gap:12px;padding:10px 0;border-bottom:1px solid var(--line);">
+        <div class="field" style="flex:1;min-width:180px;"><label>Intervalle minimum entre deux apparitions (min)</label><input type="number" min="0" step="1" id="f_balloon_int_min" value="${bc.spawnIntervalMinMin}"></div>
+        <div class="field" style="flex:1;min-width:180px;"><label>Intervalle maximum entre deux apparitions (min)</label><input type="number" min="0" step="1" id="f_balloon_int_max" value="${bc.spawnIntervalMaxMin}"></div>
+        <div class="field" style="flex:1;min-width:180px;"><label>Disparaît si non éclaté après (min)</label><input type="number" min="1" step="1" id="f_balloon_lifetime" value="${bc.lifetimeMinutes}"></div>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:12px;padding:10px 0;">
+        <div class="field" style="flex:1;min-width:180px;"><label>Distance minimum du joueur à l'apparition (m)</label><input type="number" min="0" step="1" id="f_balloon_rad_min" value="${bc.spawnRadiusMin}"></div>
+        <div class="field" style="flex:1;min-width:180px;"><label>Distance maximum du joueur à l'apparition (m)</label><input type="number" min="0" step="1" id="f_balloon_rad_max" value="${bc.spawnRadiusMax}"></div>
+        <div class="field" style="flex:1;min-width:180px;"><label>Nombre de ballons présents en même temps</label><input type="number" min="1" step="1" id="f_balloon_max_active" value="${bc.maxActive}"></div>
+      </div>
+    </div>
+    <h3 style="margin:22px 0 4px;">Récompense à l'éclatement</h3>
+    <div class="form-card">
+      <div style="display:flex;flex-wrap:wrap;gap:12px;padding:10px 0;">
+        <div class="field" style="flex:1;min-width:140px;"><label>Tampons min</label><input type="number" min="0" id="f_balloon_cmin" value="${bc.rewardCoinsMin}"></div>
+        <div class="field" style="flex:1;min-width:140px;"><label>Tampons max</label><input type="number" min="0" id="f_balloon_cmax" value="${bc.rewardCoinsMax}"></div>
+        <div class="field" style="flex:1;min-width:140px;"><label>Expérience</label><input type="number" min="0" id="f_balloon_xp" value="${bc.rewardXp}"></div>
+        <div class="field" style="flex:1;min-width:140px;"><label>Nœud Vert min</label><input type="number" min="0" id="f_balloon_nmin" value="${bc.rewardNoeudsMin}"></div>
+        <div class="field" style="flex:1;min-width:140px;"><label>Nœud Vert max</label><input type="number" min="0" id="f_balloon_nmax" value="${bc.rewardNoeudsMax}"></div>
+      </div>
+    </div>
+    <div class="form-actions"><button class="btn btn-primary" id="saveBalloonsBtn">Enregistrer</button></div>
+  </div>`;
+  document.getElementById('saveBalloonsBtn').onclick = ()=>{
+    data.balloonConfig = {
+      spawnIntervalMinMin: Number(document.getElementById('f_balloon_int_min').value)||0,
+      spawnIntervalMaxMin: Number(document.getElementById('f_balloon_int_max').value)||0,
+      lifetimeMinutes: Math.max(1, Number(document.getElementById('f_balloon_lifetime').value)||1),
+      spawnRadiusMin: Number(document.getElementById('f_balloon_rad_min').value)||0,
+      spawnRadiusMax: Number(document.getElementById('f_balloon_rad_max').value)||0,
+      maxActive: Math.max(1, Number(document.getElementById('f_balloon_max_active').value)||1),
+      rewardCoinsMin: Number(document.getElementById('f_balloon_cmin').value)||0,
+      rewardCoinsMax: Number(document.getElementById('f_balloon_cmax').value)||0,
+      rewardXp: Number(document.getElementById('f_balloon_xp').value)||0,
+      rewardNoeudsMin: Number(document.getElementById('f_balloon_nmin').value)||0,
+      rewardNoeudsMax: Number(document.getElementById('f_balloon_nmax').value)||0,
+    };
+    saveDraft();
+    const btn = document.getElementById('saveBalloonsBtn');
     const label = btn.textContent; btn.textContent = 'Enregistré ✓';
     setTimeout(()=>{ btn.textContent = label; }, 1400);
   };
@@ -1101,6 +1179,7 @@ function importData(file){
       else CHEST_COLORS.forEach(c=>{ if(!data.chestRewards[c]) data.chestRewards[c] = defaultChestRewards()[c]; });
       ensureShopConfig(data);
       ensureDropConfig(data);
+      ensureBalloonConfig(data);
       editingMerchantId=editingPoiId=editingEventId=editingMissionId=editingBadgeId=null; newBadgeDraft=null;
       saveDraft(); renderAll();
       alert('Import réussi : '+data.merchants.length+' commerçant(s), '+data.pois.length+' POI, '+data.events.length+' évènement(s), '+data.missions.length+' mission(s), '+data.badges.length+' badge(s).');
@@ -1121,6 +1200,7 @@ async function fetchLiveDataOrEmpty(){
         else CHEST_COLORS.forEach(c=>{ if(!json.chestRewards[c]) json.chestRewards[c] = defaultChestRewards()[c]; });
         ensureShopConfig(json);
         ensureDropConfig(json);
+        ensureBalloonConfig(json);
         return json;
       }
     }
@@ -1250,6 +1330,7 @@ async function boot(){
   else CHEST_COLORS.forEach(c=>{ if(!data.chestRewards[c]) data.chestRewards[c] = defaultChestRewards()[c]; });
   ensureShopConfig(data);
   ensureDropConfig(data);
+  ensureBalloonConfig(data);
   document.getElementById('exportBtn').onclick = exportData;
   document.getElementById('importBtn').onclick = ()=> document.getElementById('importInput').click();
   document.getElementById('importInput').onchange = (e)=>{ const f=e.target.files[0]; if(f) importData(f); e.target.value=''; };
