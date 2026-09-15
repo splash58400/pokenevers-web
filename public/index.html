@@ -546,10 +546,14 @@ const CHEST_OPEN_MS = {
 };
 // Poids relatifs utilisés pour tirer la couleur d'une trouvaille (clé ou coffre) — du plus
 // courant (Jaune) au plus rare (Noir), même logique que RARITY_CATCH pour les commerçants.
-const CHEST_DROP_WEIGHTS = {jaune:50, vert:27, bleu:14, violet:7, noir:2};
+// Réglable depuis le panel admin (gamedata.dropConfig, Version 20) — DEFAULT_* sert de repli.
+const DEFAULT_CHEST_DROP_WEIGHTS = {jaune:50, vert:27, bleu:14, violet:7, noir:2};
 // Probabilité, à chaque point d'intérêt actionné (spinPoi), de trouver une clé et/ou un coffre —
 // indépendamment l'une de l'autre, en plus de la récompense XP/tampons habituelle du POI.
-const CHEST_FIND_CHANCE = {key:0.09, chest:0.05};
+// Réglable depuis le panel admin (gamedata.dropConfig, Version 20) — DEFAULT_* sert de repli.
+const DEFAULT_CHEST_FIND_CHANCE = {key:0.09, chest:0.05};
+let ACTIVE_CHEST_DROP_WEIGHTS = DEFAULT_CHEST_DROP_WEIGHTS;
+let ACTIVE_CHEST_FIND_CHANCE = DEFAULT_CHEST_FIND_CHANCE;
 // Récompense par défaut à l'ouverture d'un coffre (XP + tampons) — réglable depuis le panel
 // admin (gamedata.chestRewards), ces valeurs ne servent que si aucune configuration n'est
 // encore déployée ou si une couleur manque dans le fichier.
@@ -572,9 +576,9 @@ let ACTIVE_KEY_PRICES = DEFAULT_KEY_PRICES;
 let ACTIVE_CHEST_SKIP_PRICES = DEFAULT_CHEST_SKIP_PRICES;
 let ACTIVE_NOEUD_PRICE = DEFAULT_NOEUD_PRICE;
 function pickChestColor(){
-  const total = CHEST_COLORS.reduce((a,c)=>a+CHEST_DROP_WEIGHTS[c],0);
+  const total = CHEST_COLORS.reduce((a,c)=>a+ACTIVE_CHEST_DROP_WEIGHTS[c],0);
   let r = Math.random()*total;
-  for(const c of CHEST_COLORS){ r -= CHEST_DROP_WEIGHTS[c]; if(r<=0) return c; }
+  for(const c of CHEST_COLORS){ r -= ACTIVE_CHEST_DROP_WEIGHTS[c]; if(r<=0) return c; }
   return CHEST_COLORS[0];
 }
 function fmtDuration(ms){
@@ -1026,15 +1030,15 @@ function spinPoi(p,i){
   checkMissions();
 }
 // Trouvailles rares à un point d'intérêt : une clé et un coffre sont tirés indépendamment
-// (voir CHEST_FIND_CHANCE), chacun avec une couleur pondérée par CHEST_DROP_WEIGHTS.
+// (voir ACTIVE_CHEST_FIND_CHANCE), chacun avec une couleur pondérée par ACTIVE_CHEST_DROP_WEIGHTS.
 function rollChestDrop(){
   const msgs = [];
-  if(Math.random() < CHEST_FIND_CHANCE.key){
+  if(Math.random() < ACTIVE_CHEST_FIND_CHANCE.key){
     const color = pickChestColor();
     state.keys[color] = (state.keys[color]||0) + 1;
     msgs.push(`🔑 Clé ${CHEST_COLOR_LABEL[color]} trouvée !`);
   }
-  if(Math.random() < CHEST_FIND_CHANCE.chest){
+  if(Math.random() < ACTIVE_CHEST_FIND_CHANCE.chest){
     const color = pickChestColor();
     state.chests.push({ id: 'chest_'+Date.now().toString(36)+Math.random().toString(36).slice(2,7), color, foundAt: Date.now() });
     msgs.push(`🧰 Coffre ${CHEST_COLOR_LABEL[color]} trouvé !`);
@@ -1568,6 +1572,18 @@ function applyGameData(){
       ACTIVE_CHEST_SKIP_PRICES = merged;
     }
     ACTIVE_NOEUD_PRICE = sc.noeudPrice!=null ? sc.noeudPrice : DEFAULT_NOEUD_PRICE;
+  }
+  if(gameData.dropConfig && typeof gameData.dropConfig==='object'){
+    const dc = gameData.dropConfig;
+    if(dc.weights && typeof dc.weights==='object'){
+      const merged = {};
+      CHEST_COLORS.forEach(c=>{ merged[c] = dc.weights[c]!=null ? dc.weights[c] : DEFAULT_CHEST_DROP_WEIGHTS[c]; });
+      ACTIVE_CHEST_DROP_WEIGHTS = merged;
+    }
+    ACTIVE_CHEST_FIND_CHANCE = {
+      key: dc.keyChance!=null ? dc.keyChance : DEFAULT_CHEST_FIND_CHANCE.key,
+      chest: dc.chestChance!=null ? dc.chestChance : DEFAULT_CHEST_FIND_CHANCE.chest
+    };
   }
   ACTIVE_MISSIONS = (gameData.missions||[]).filter(mi=> mi.active!==false);
   const liveBadges = (gameData.badges||[]).filter(b=> b.active!==false);

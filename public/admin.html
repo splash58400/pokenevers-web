@@ -276,8 +276,28 @@ function ensureShopConfig(obj){
   else CHEST_COLORS.forEach(c=>{ if(obj.shopConfig.chestSkipPrices[c]==null) obj.shopConfig.chestSkipPrices[c] = d.chestSkipPrices[c]; });
   if(obj.shopConfig.noeudPrice==null) obj.shopConfig.noeudPrice = d.noeudPrice;
 }
+// Taux de trouvaille de clés/coffres (Version 20) : par défaut, en pourcentage de chance à
+// chaque point d'intérêt actionné (keyChance/chestChance) et poids relatifs par couleur (weights)
+// — mêmes valeurs que côté jeu (public/index.html, DEFAULT_CHEST_FIND_CHANCE / DEFAULT_CHEST_DROP_WEIGHTS),
+// à garder synchronisées si l'une des deux est modifiée.
+function defaultDropConfig(){
+  return {
+    keyChance: 0.09, chestChance: 0.05,
+    weights: {jaune:50, vert:27, bleu:14, violet:7, noir:2},
+  };
+}
+// Complète un objet de données avec un dropConfig valide, même logique de "backfill" que pour
+// shopConfig/chestRewards ci-dessus.
+function ensureDropConfig(obj){
+  const d = defaultDropConfig();
+  if(!obj.dropConfig || typeof obj.dropConfig!=='object'){ obj.dropConfig = d; return; }
+  if(obj.dropConfig.keyChance==null) obj.dropConfig.keyChance = d.keyChance;
+  if(obj.dropConfig.chestChance==null) obj.dropConfig.chestChance = d.chestChance;
+  if(!obj.dropConfig.weights || typeof obj.dropConfig.weights!=='object') obj.dropConfig.weights = d.weights;
+  else CHEST_COLORS.forEach(c=>{ if(obj.dropConfig.weights[c]==null) obj.dropConfig.weights[c] = d.weights[c]; });
+}
 function emptyData(){
-  return { version:1, updatedAt: nowIso(), merchants:[], pois:[], events:[], missions:[], badges:[], chestRewards: defaultChestRewards(), shopConfig: defaultShopConfig() };
+  return { version:1, updatedAt: nowIso(), merchants:[], pois:[], events:[], missions:[], badges:[], chestRewards: defaultChestRewards(), shopConfig: defaultShopConfig(), dropConfig: defaultDropConfig() };
 }
 let data = null;
 function loadDraft(){
@@ -490,12 +510,21 @@ function renderMain(){
   }
 }
 /* ============================= COFFRES ============================= */
-// Les taux de trouvaille des clés/coffres aux points d'intérêt restent fixés côté jeu (voir
-// index.html) ; seule la récompense obtenue à l'ouverture (Expérience + tampons par couleur) est
-// réglable ici, comme demandé. Choix (Version 18) : les coffres ne donnent pas de Nœud Vert,
-// seuls les points d'intérêt en donnent — pour garder une source de capture unique et lisible.
+// Taux de trouvaille des clés/coffres aux points d'intérêt (Version 20) et récompense obtenue à
+// l'ouverture (Expérience + tampons par couleur, depuis la Version 18) : tous réglables ici.
+// Choix (Version 18) : les coffres ne donnent pas de Nœud Vert, seuls les points d'intérêt en
+// donnent — pour garder une source de capture unique et lisible.
 function renderChestsPanel(){
   const main = document.getElementById('mainArea');
+  ensureDropConfig(data);
+  const dc = data.dropConfig;
+  const dropRows = CHEST_COLORS.map(c=>{
+    return `<div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line);">
+      <span style="width:20px;height:20px;border-radius:50%;background:${CHEST_COLOR_SWATCH[c]};box-shadow:0 0 0 2px var(--line) inset;flex:none;"></span>
+      <div style="min-width:130px;flex:1;font-weight:800;">${CHEST_COLOR_LABEL[c]}</div>
+      <div class="field" style="flex:1;min-width:140px;"><label>Poids relatif (couleur)</label><input type="number" min="0" step="1" id="f_drop_weight_${c}" value="${dc.weights[c]}"></div>
+    </div>`;
+  }).join('');
   const rows = CHEST_COLORS.map(c=>{
     const r = data.chestRewards[c] || defaultChestRewards()[c];
     return `<div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line);">
@@ -507,7 +536,17 @@ function renderChestsPanel(){
   }).join('');
   main.innerHTML = `<div class="panel">
     <h2>Coffres</h2>
-    <p class="hint">Les joueurs trouvent des clés et des coffres (5 couleurs, du commun "Jaune" à l'extrêmement rare "Noir") en faisant tourner les points d'intérêt. Une clé ouvre un coffre de la même couleur ; le minuteur d'ouverture dépend de la couleur (fixé côté jeu). Vous réglez ici uniquement la récompense obtenue une fois le coffre ouvert.</p>
+    <p class="hint">Les joueurs trouvent des clés et des coffres (5 couleurs, du commun "Jaune" à l'extrêmement rare "Noir") en faisant tourner les points d'intérêt. Une clé ouvre un coffre de la même couleur ; le minuteur d'ouverture dépend de la couleur (fixé côté jeu). Vous réglez ici la fréquence des trouvailles, la répartition par couleur, et la récompense obtenue une fois le coffre ouvert.</p>
+    <h3 style="margin:18px 0 4px;">Taux de trouvaille</h3>
+    <p class="hint">À chaque point d'intérêt actionné, deux chances indépendantes de trouver une clé et/ou un coffre. La couleur trouvée est ensuite tirée selon les poids ci-dessous (un poids plus élevé = plus fréquent ; les valeurs n'ont pas besoin de totaliser 100, seul le rapport entre elles compte).</p>
+    <div class="form-card">
+      <div style="display:flex;flex-wrap:wrap;gap:12px;padding:10px 0;border-bottom:1px solid var(--line);">
+        <div class="field" style="flex:1;min-width:180px;"><label>Chance de trouver une clé (%)</label><input type="number" min="0" max="100" step="0.1" id="f_drop_key_chance" value="${Math.round(dc.keyChance*1000)/10}"></div>
+        <div class="field" style="flex:1;min-width:180px;"><label>Chance de trouver un coffre (%)</label><input type="number" min="0" max="100" step="0.1" id="f_drop_chest_chance" value="${Math.round(dc.chestChance*1000)/10}"></div>
+      </div>
+      ${dropRows}
+    </div>
+    <h3 style="margin:22px 0 4px;">Récompense à l'ouverture</h3>
     <div class="form-card">${rows}</div>
     <div class="form-actions"><button class="btn btn-primary" id="saveChestsBtn">Enregistrer</button></div>
   </div>`;
@@ -520,6 +559,11 @@ function renderChestsPanel(){
       };
     });
     data.chestRewards = next;
+    const weights = {};
+    CHEST_COLORS.forEach(c=>{ weights[c] = Math.max(0, Number(document.getElementById(`f_drop_weight_${c}`).value)||0); });
+    const keyChancePct = Math.max(0, Math.min(100, Number(document.getElementById('f_drop_key_chance').value)||0));
+    const chestChancePct = Math.max(0, Math.min(100, Number(document.getElementById('f_drop_chest_chance').value)||0));
+    data.dropConfig = { keyChance: keyChancePct/100, chestChance: chestChancePct/100, weights };
     saveDraft();
     const btn = document.getElementById('saveChestsBtn');
     const label = btn.textContent; btn.textContent = 'Enregistré ✓';
@@ -530,9 +574,9 @@ function renderChestsPanel(){
 /* ============================= BOUTIQUE ============================= */
 // Boutique (Version 19) : les joueurs dépensent leurs tampons dans l'onglet Inventaire pour
 // acheter des clés (prix par couleur), terminer immédiatement l'ouverture d'un coffre en cours
-// (prix par couleur) ou acheter directement des Nœuds Verts (prix unique). Les taux de trouvaille
-// de clés/coffres et le fonctionnement des Nœuds Verts restent fixés côté jeu ; seuls ces prix
-// sont réglables ici.
+// (prix par couleur) ou acheter directement des Nœuds Verts (prix unique). Le fonctionnement des
+// Nœuds Verts reste fixé côté jeu ; les taux de trouvaille de clés/coffres se règlent désormais
+// dans l'onglet Coffres (Version 20) et ces prix se règlent ici.
 function renderShopPanel(){
   const main = document.getElementById('mainArea');
   ensureShopConfig(data);
@@ -1056,6 +1100,7 @@ function importData(file){
       if(!data.chestRewards || typeof data.chestRewards!=='object') data.chestRewards = defaultChestRewards();
       else CHEST_COLORS.forEach(c=>{ if(!data.chestRewards[c]) data.chestRewards[c] = defaultChestRewards()[c]; });
       ensureShopConfig(data);
+      ensureDropConfig(data);
       editingMerchantId=editingPoiId=editingEventId=editingMissionId=editingBadgeId=null; newBadgeDraft=null;
       saveDraft(); renderAll();
       alert('Import réussi : '+data.merchants.length+' commerçant(s), '+data.pois.length+' POI, '+data.events.length+' évènement(s), '+data.missions.length+' mission(s), '+data.badges.length+' badge(s).');
@@ -1075,6 +1120,7 @@ async function fetchLiveDataOrEmpty(){
         if(!json.chestRewards || typeof json.chestRewards!=='object') json.chestRewards = defaultChestRewards();
         else CHEST_COLORS.forEach(c=>{ if(!json.chestRewards[c]) json.chestRewards[c] = defaultChestRewards()[c]; });
         ensureShopConfig(json);
+        ensureDropConfig(json);
         return json;
       }
     }
@@ -1203,6 +1249,7 @@ async function boot(){
   if(!data.chestRewards || typeof data.chestRewards!=='object') data.chestRewards = defaultChestRewards();
   else CHEST_COLORS.forEach(c=>{ if(!data.chestRewards[c]) data.chestRewards[c] = defaultChestRewards()[c]; });
   ensureShopConfig(data);
+  ensureDropConfig(data);
   document.getElementById('exportBtn').onclick = exportData;
   document.getElementById('importBtn').onclick = ()=> document.getElementById('importInput').click();
   document.getElementById('importInput').onchange = (e)=>{ const f=e.target.files[0]; if(f) importData(f); e.target.value=''; };
