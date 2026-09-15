@@ -490,18 +490,18 @@ const POI_DEFS = [
 /* ============================= DATA ============================= */
 const RARITY_LABEL = {commun:'Commun','peu-commun':'Peu commun', rare:'Rare', legendaire:'Légendaire'};
 const RARITY_CATCH = {commun:.78, 'peu-commun':.55, rare:.35, legendaire:.14};
-// RARITY_XP alimente la Réputation du dresseur (voir plus bas) : un total qui ne baisse jamais
+// RARITY_XP alimente l'Expérience du dresseur (voir plus bas) : un total qui ne baisse jamais
 // et sert uniquement à calculer le niveau affiché (levelFromXp/xpForLevel). Le nom de la
-// constante n'a pas changé (pour ne rien casser), seul l'affichage au joueur dit "Réputation".
+// constante n'a pas changé (pour ne rien casser), seul l'affichage au joueur dit "Expérience"/"exp".
 const RARITY_XP    = {commun:40, 'peu-commun':70, rare:120, legendaire:400};
 const RARITY_CANDY = {commun:3, 'peu-commun':3, rare:2, legendaire:1};
 const RARITY_ZONE  = {commun:.34, 'peu-commun':.26, rare:.19, legendaire:.13};
 const RARITY_ROUNDS = {commun:1, 'peu-commun':2, rare:3, legendaire:4};
-// Un nouveau dresseur démarre avec un petit capital de Réputation, pour ne pas se retrouver
+// Un nouveau dresseur démarre avec un petit capital d'Expérience, pour ne pas se retrouver
 // bloqué dès la toute première capture (voir defaultState()).
 const STARTING_XP = 20;
 // Le Nœud Vert (Version 18) : l'équivalent Poké Ball du jeu — une réserve à part, totalement
-// indépendante de la Réputation/du niveau (demande explicite de Jérémy après discussion : avant
+// indépendante de l'Expérience/du niveau (demande explicite de Jérémy après discussion : avant
 // cette version, une seule jauge XP servait à la fois de niveau ET de ressource de capture, ce
 // qui faisait redescendre le niveau affiché en cas d'échec — signalé comme point de conception
 // ouvert depuis la Version 13/14, tranché ici). Un Nœud Vert est consommé à CHAQUE lancer
@@ -985,7 +985,7 @@ function spinPoi(p,i){
   saveLocal();
   renderStatusBar();
   if(activeView==='inventory') renderInventory();
-  let msg = `${p.name} : +${gained} tampons, +${noeudsGained} Nœud Vert, +${xpGain} Réputation !`;
+  let msg = `${p.name} : +${gained} tampons, +${noeudsGained} Nœud Vert, +${xpGain} exp !`;
   if(findMsgs.length) msg += ' ' + findMsgs.join(' ');
   showToast(msg);
   checkMissions();
@@ -1148,7 +1148,7 @@ function doThrow(){
         document.getElementById('captureDoneBtn').onclick = closeCapture;
       } else {
         applyCapture(capture.species, capture.spawnUid);
-        wrap.innerHTML = `<div class="capture-result success">Capturé !</div><p class="capture-hint">+${RARITY_XP[capture.species.rarity]} Réputation · +${RARITY_CANDY[capture.species.rarity]} tampons</p><button class="btn btn-primary" id="captureDoneBtn" style="margin-top:10px;">Continuer</button>`;
+        wrap.innerHTML = `<div class="capture-result success">Capturé !</div><p class="capture-hint">+${RARITY_XP[capture.species.rarity]} exp · +${RARITY_CANDY[capture.species.rarity]} tampons</p><button class="btn btn-primary" id="captureDoneBtn" style="margin-top:10px;">Continuer</button>`;
         document.getElementById('captureDoneBtn').onclick = closeCapture;
       }
     } else {
@@ -1366,10 +1366,10 @@ function battleSegmentsFor(merchantId, reward){
 }
 function battleRewardText(reward){
   switch(reward.type){
-    case 'xp_small': case 'xp_big': return `+${reward.xp} Réputation`;
+    case 'xp_small': case 'xp_big': return `+${reward.xp} exp`;
     case 'coins_small': case 'coins_big': return `+${reward.coins} tampons`;
-    case 'jackpot': return `JACKPOT ! +${reward.xp} Réputation et +${reward.coins} tampons`;
-    case 'coupon': return `🎁 ${escapeHtml(reward.couponLabel||'Bon de réduction')} — montrez cet écran en caisse (code ${escapeHtml(reward.couponCode||'')})${reward.xp?` · +${reward.xp} Réputation`:''}`;
+    case 'jackpot': return `JACKPOT ! +${reward.xp} exp et +${reward.coins} tampons`;
+    case 'coupon': return `🎁 ${escapeHtml(reward.couponLabel||'Bon de réduction')} — montrez cet écran en caisse (code ${escapeHtml(reward.couponCode||'')})${reward.xp?` · +${reward.xp} exp`:''}`;
     default: return '';
   }
 }
@@ -1556,7 +1556,7 @@ function checkMissions(){
       state.xp += mi.rewardXp||0;
       state.coins += mi.rewardCoins||0;
       changed = true;
-      showToast(`Mission accomplie : ${mi.title}${mi.rewardXp?` (+${mi.rewardXp} Réputation)`:''}`);
+      showToast(`Mission accomplie : ${mi.title}${mi.rewardXp?` (+${mi.rewardXp} exp)`:''}`);
     }
   });
   if(changed){ saveLocal(); renderStatusBar(); }
@@ -1584,7 +1584,7 @@ function renderMissions(){
       <p style="font-size:13px;color:var(--ink-soft);margin:10px 0 6px 0;">${escapeHtml(mi.description||'')}</p>
       <div class="mission-progress"><i style="width:${pct}%;background:${done?'var(--green)':'var(--blue-600)'};"></i></div>
       <p style="font-size:11px;color:var(--ink-faint);font-weight:700;margin:6px 0 0 0;">${progress} / ${target}${badge?' · Badge : '+escapeHtml(badge.label):''}</p>
-      <p style="font-size:12px;font-weight:800;color:var(--gold-dark);margin:6px 0 0 0;">+${mi.rewardXp||0} Réputation · +${mi.rewardCoins||0} tampons</p>
+      <p style="font-size:12px;font-weight:800;color:var(--gold-dark);margin:6px 0 0 0;">+${mi.rewardXp||0} exp · +${mi.rewardCoins||0} tampons</p>
     </div>`;
   }).join('');
   el.innerHTML = `<h1>Missions</h1><p class="sub">Objectifs à accomplir en ville</p>${cards}`;
@@ -1675,7 +1675,7 @@ function collectChest(){
   saveLocal();
   renderStatusBar();
   renderInventory();
-  showToast(`Coffre ${CHEST_COLOR_LABEL[opening.color]} ouvert ! +${reward.xp} Réputation, +${reward.coins} tampons.`);
+  showToast(`Coffre ${CHEST_COLOR_LABEL[opening.color]} ouvert ! +${reward.xp} exp, +${reward.coins} tampons.`);
   checkMissions();
 }
 
@@ -1692,7 +1692,7 @@ function renderProfile(){
     <div style="background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-md);padding:4px 16px;box-shadow:var(--shadow-sm);">
       <div class="profile-stat"><span>Pokemerçants découverts</span><strong>${totalCaught} / ${ACTIVE_MERCHANTS.length}</strong></div>
       <div class="profile-stat"><span>Évolutions réalisées</span><strong>${totalEvolved}</strong></div>
-      <div class="profile-stat"><span>Réputation totale</span><strong>${state.xp}</strong></div>
+      <div class="profile-stat"><span>Expérience totale</span><strong>${state.xp}</strong></div>
       <div class="profile-stat"><span>Tampons en poche</span><strong>${state.coins}</strong></div>
       <div class="profile-stat"><span>Nœuds Verts en poche</span><strong>${state.noeudsVerts}</strong></div>
     </div>
