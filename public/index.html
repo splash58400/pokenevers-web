@@ -97,7 +97,7 @@ button{font-family:inherit;}
 /* ---------- top status bar ---------- */
 #statusBar{
   position:absolute; top:0; left:0; right:0; z-index:410;
-  display:flex; justify-content:space-between; align-items:flex-start;
+  display:flex; flex-wrap:wrap; justify-content:space-between; align-items:flex-start; gap:6px;
   padding:calc(10px + env(safe-area-inset-top,0px)) 12px 0 12px;
   pointer-events:none;
 }
@@ -188,7 +188,7 @@ button{font-family:inherit;}
 /* Badge niveau/XP du joueur, coin bas-gauche de la carte — le vrai #statusBar (en haut)
    est masqué par #tabbar (voir commentaire "bottom nav" plus bas), donc ce badge autonome
    est le seul indicateur de niveau réellement visible pour le joueur, uniquement sur la carte. */
-.map-level-badge-wrap{position:absolute; left:14px; bottom:calc(14px + env(safe-area-inset-bottom,0px)); z-index:400;}
+.map-level-badge-wrap{position:absolute; left:14px; bottom:calc(14px + env(safe-area-inset-bottom,0px)); z-index:400; display:flex; flex-direction:column; gap:8px; align-items:flex-start;}
 .map-level-badge-wrap .pill{cursor:pointer;}
 .map-level-badge-wrap .pill:active{transform:scale(.96);}
 
@@ -460,7 +460,11 @@ const ICONS = {
   locate:'<circle cx="12" cy="12" r="2.6"/><path d="M12 2v3.4M12 18.6V22M2 12h3.4M18.6 12H22" stroke-linecap="round"/>',
   flag:'<path d="M6 3v18"/><path d="M6 4h11l-2.5 3.5L17 11H6"/>',
   key:'<circle cx="7.5" cy="7.5" r="3.5"/><path d="M10 10 19.5 19.5" stroke-linecap="round"/><path d="M15.5 15 17.7 12.8M18 17.5 20.2 15.3" stroke-linecap="round"/>',
-  chest:'<rect x="4" y="10.5" width="16" height="8.5" rx="1.4"/><path d="M4 10.5a8 4.3 0 0 1 16 0"/><rect x="10.4" y="12.7" width="3.2" height="3.2" rx="0.6"/>'
+  chest:'<rect x="4" y="10.5" width="16" height="8.5" rx="1.4"/><path d="M4 10.5a8 4.3 0 0 1 16 0"/><rect x="10.4" y="12.7" width="3.2" height="3.2" rx="0.6"/>',
+  // Le Nœud Vert : marque historique des faïenciers de Nevers — un rébus (branches de laurier
+  // et de chêne nouées par un ruban vert) qui, en le lisant, sonne comme "Nevers". Ici simplifié
+  // en deux branches (avec leurs feuilles) nouées par un petit nœud/ruban en bas.
+  noeud:'<path d="M12 19c-3.2-1.7-5.1-5.5-4.4-10.3" stroke-linecap="round"/><path d="M8.2 11.4 6.2 10.6M8.8 14.2 6.8 13.7M9.7 16.8 7.7 17" stroke-linecap="round"/><path d="M12 19c3.2-1.7 5.1-5.5 4.4-10.3" stroke-linecap="round"/><path d="M15.8 11.4 17.8 10.6M15.2 14.2 17.2 13.7M14.3 16.8 16.3 17" stroke-linecap="round"/><path d="M12 19.2 8.3 17.3v3.8L12 19.2Z"/><path d="M12 19.2 15.7 17.3v3.8L12 19.2Z"/><circle cx="12" cy="19.2" r="1" fill="currentColor" stroke="none"/>'
 };
 function icon(name, extra){ return `<svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" ${extra||''}>${ICONS[name]||ICONS.star}</svg>`; }
 
@@ -486,17 +490,24 @@ const POI_DEFS = [
 /* ============================= DATA ============================= */
 const RARITY_LABEL = {commun:'Commun','peu-commun':'Peu commun', rare:'Rare', legendaire:'Légendaire'};
 const RARITY_CATCH = {commun:.78, 'peu-commun':.55, rare:.35, legendaire:.14};
+// RARITY_XP alimente la Réputation du dresseur (voir plus bas) : un total qui ne baisse jamais
+// et sert uniquement à calculer le niveau affiché (levelFromXp/xpForLevel). Le nom de la
+// constante n'a pas changé (pour ne rien casser), seul l'affichage au joueur dit "Réputation".
 const RARITY_XP    = {commun:40, 'peu-commun':70, rare:120, legendaire:400};
 const RARITY_CANDY = {commun:3, 'peu-commun':3, rare:2, legendaire:1};
 const RARITY_ZONE  = {commun:.34, 'peu-commun':.26, rare:.19, legendaire:.13};
 const RARITY_ROUNDS = {commun:1, 'peu-commun':2, rare:3, legendaire:4};
-// Échouer une capture coûte de l'XP (plus la rareté est élevée, plus la perte est lourde — même
-// logique que le reste du jeu). À 0 XP, impossible de retenter une capture tant qu'on n'est pas
-// repassé par un point d'intérêt pour en regagner (voir onSpawnTap et spinPoi).
-const RARITY_XP_LOSS = {commun:10, 'peu-commun':18, rare:30, legendaire:60};
-// Un nouveau dresseur démarre avec un petit capital d'XP, pour ne pas se retrouver bloqué dès
-// la toute première capture (voir defaultState()).
+// Un nouveau dresseur démarre avec un petit capital de Réputation, pour ne pas se retrouver
+// bloqué dès la toute première capture (voir defaultState()).
 const STARTING_XP = 20;
+// Le Nœud Vert (Version 18) : l'équivalent Poké Ball du jeu — une réserve à part, totalement
+// indépendante de la Réputation/du niveau (demande explicite de Jérémy après discussion : avant
+// cette version, une seule jauge XP servait à la fois de niveau ET de ressource de capture, ce
+// qui faisait redescendre le niveau affiché en cas d'échec — signalé comme point de conception
+// ouvert depuis la Version 13/14, tranché ici). Un Nœud Vert est consommé à CHAQUE lancer
+// (chaque manche du mini-jeu de capture), qu'il touche la zone ou non — comme une vraie Poké
+// Ball — et se regagne principalement en faisant tourner les points d'intérêt (voir spinPoi).
+const STARTING_NOEUDS = 15;
 
 /* ============================= CLÉS & COFFRES ============================= */
 // Trouvailles rares aux points d'intérêt (voir spinPoi) : une clé d'une couleur ouvre un coffre
@@ -650,6 +661,7 @@ function defaultState(){
   return {
     trainerName:null,
     xp:STARTING_XP,
+    noeudsVerts:STARTING_NOEUDS,
     coins:0,
     captures:{},
     poiSpins:{},
@@ -916,7 +928,7 @@ function onSpawnTap(sp){
   if(curLat===null){ showToast('En attente de votre position GPS...'); return; }
   const dist = map.distance([curLat,curLon],[sp.lat,sp.lon]);
   if(dist>RANGE_M){ showToast(`Trop loin (${fmtDist(dist)}) — rapprochez-vous à moins de ${RANGE_M} m.`); return; }
-  if(state.xp<=0){ showToast("Plus assez d'XP pour tenter une capture — direction un point d'intérêt pour vous refaire une santé !"); return; }
+  if(state.noeudsVerts<=0){ showToast("Plus de Nœud Vert pour tenter une capture — direction un point d'intérêt pour vous refaire une réserve !"); return; }
   if(usingLiveMerchants){
     const last = state.captureCooldowns[sp.speciesId]||0;
     const cooldownMs = 10*60*1000;
@@ -964,13 +976,16 @@ function spinPoi(p,i){
   const mult = eventBonusMultiplier();
   const gained = Math.round((cMin+Math.floor(Math.random()*(cMax-cMin+1)))*mult);
   const xpGain = Math.round((p.rewardXp!=null?p.rewardXp:15)*mult);
+  const nMin = p.rewardNoeudsMin!=null?p.rewardNoeudsMin:1, nMax = p.rewardNoeudsMax!=null?p.rewardNoeudsMax:3;
+  const noeudsGained = Math.round((nMin+Math.floor(Math.random()*(nMax-nMin+1)))*mult);
   state.coins += gained;
   state.xp += xpGain;
+  state.noeudsVerts += noeudsGained;
   const findMsgs = rollChestDrop();
   saveLocal();
   renderStatusBar();
   if(activeView==='inventory') renderInventory();
-  let msg = `${p.name} : +${gained} tampons, +${xpGain} XP !`;
+  let msg = `${p.name} : +${gained} tampons, +${noeudsGained} Nœud Vert, +${xpGain} Réputation !`;
   if(findMsgs.length) msg += ' ' + findMsgs.join(' ');
   showToast(msg);
   checkMissions();
@@ -1094,6 +1109,10 @@ function captureLoop(){
 function doThrow(){
   if(!capture || capture.resolved) return;
   capture.running=false; capture.resolved=true;
+  // Un Nœud Vert est consommé à chaque lancer, réussi ou non — comme une vraie Poké Ball.
+  state.noeudsVerts = Math.max(0, state.noeudsVerts-1);
+  saveLocal();
+  renderStatusBar();
   const zoneW = RARITY_ZONE[capture.species.rarity];
   const inZone = capture.pos>=capture.zoneStart && capture.pos<=capture.zoneStart+zoneW;
   // Toucher la zone verte = capture de la manche, point final (comme l'indique le texte à l'écran) :
@@ -1107,7 +1126,7 @@ function doThrow(){
     const wrap = document.getElementById('captureResultWrap');
     if(success){
       capture.roundsWon++;
-      if(capture.roundsWon < capture.roundsTotal){
+      if(capture.roundsWon < capture.roundsTotal && state.noeudsVerts>0){
         portrait.classList.remove('shake');
         portrait.classList.add('round-won');
         setTimeout(()=> portrait && portrait.classList.remove('round-won'), 500);
@@ -1122,18 +1141,19 @@ function doThrow(){
         document.getElementById('throwBtn').style.visibility='visible';
         setTimeout(()=>{ if(capture) wrap.innerHTML=''; }, 900);
         requestAnimationFrame(captureLoop);
+      } else if(capture.roundsWon < capture.roundsTotal){
+        // Plus aucun Nœud Vert pour enchaîner une manche supplémentaire : la cible s'échappe,
+        // malgré la dernière manche réussie (comme à court de Poké Balls face à un Pokémon coriace).
+        wrap.innerHTML = `<div class="capture-result fail">Plus de Nœud Vert : il s'échappe…</div><p class="capture-hint">Refaites une réserve sur un point d'intérêt avant de retenter votre chance.</p><button class="btn btn-ghost" id="captureDoneBtn" style="margin-top:10px;">Fermer</button>`;
+        document.getElementById('captureDoneBtn').onclick = closeCapture;
       } else {
         applyCapture(capture.species, capture.spawnUid);
-        wrap.innerHTML = `<div class="capture-result success">Capturé !</div><p class="capture-hint">+${RARITY_XP[capture.species.rarity]} XP · +${RARITY_CANDY[capture.species.rarity]} tampons</p><button class="btn btn-primary" id="captureDoneBtn" style="margin-top:10px;">Continuer</button>`;
+        wrap.innerHTML = `<div class="capture-result success">Capturé !</div><p class="capture-hint">+${RARITY_XP[capture.species.rarity]} Réputation · +${RARITY_CANDY[capture.species.rarity]} tampons</p><button class="btn btn-primary" id="captureDoneBtn" style="margin-top:10px;">Continuer</button>`;
         document.getElementById('captureDoneBtn').onclick = closeCapture;
       }
     } else {
-      const loss = Math.min(state.xp, RARITY_XP_LOSS[capture.species.rarity]);
-      state.xp = Math.max(0, state.xp - RARITY_XP_LOSS[capture.species.rarity]);
-      saveLocal();
-      renderStatusBar();
-      const outOfXp = state.xp<=0;
-      wrap.innerHTML = `<div class="capture-result fail">Il s'est échappé…</div><p class="capture-hint">${loss>0?`-${loss} XP · `:''}Retentez votre chance sur un prochain passage.</p>${outOfXp?`<p class="capture-hint" style="color:var(--brick-dark); font-weight:700;">Plus d'XP ! Direction un point d'intérêt pour vous refaire une santé.</p>`:''}<button class="btn btn-ghost" id="captureDoneBtn" style="margin-top:10px;">Fermer</button>`;
+      const outOfNoeuds = state.noeudsVerts<=0;
+      wrap.innerHTML = `<div class="capture-result fail">Il s'est échappé…</div><p class="capture-hint">Retentez votre chance sur un prochain passage.</p>${outOfNoeuds?`<p class="capture-hint" style="color:var(--brick-dark); font-weight:700;">Plus de Nœud Vert ! Direction un point d'intérêt pour vous refaire une réserve.</p>`:''}<button class="btn btn-ghost" id="captureDoneBtn" style="margin-top:10px;">Fermer</button>`;
       document.getElementById('captureDoneBtn').onclick = closeCapture;
     }
   }, 380);
@@ -1169,12 +1189,18 @@ function renderStatusBar(){
     <div class="pill gold">
       <div>${icon('star', 'style="width:15px;height:15px;stroke:var(--gold-dark)"')}</div>
       <div>${state.coins}<br><small style="margin-top:-2px;">tampons</small></div>
+    </div>
+    <div class="pill green">
+      <div>${icon('noeud', 'style="width:15px;height:15px;stroke:var(--green-dark, var(--green))"')}</div>
+      <div>${state.noeudsVerts}<br><small style="margin-top:-2px;">Nœud Vert</small></div>
     </div>`;
   renderMapLevelBadge();
 }
-// Badge niveau/XP visible dans le coin bas-gauche de la carte (demande de Jérémy) —
-// tenu à jour à chaque appel de renderStatusBar(), donc toujours synchro avec l'XP réel.
-// Un tap dessus ouvre l'onglet Profil, comme un raccourci.
+// Badge niveau + Nœud Vert visible dans le coin bas-gauche de la carte (demande de Jérémy pour le
+// niveau ; le Nœud Vert a été ajouté ici aussi en Version 18, pour la même raison : c'est la
+// ressource qu'on consomme en tentant une capture directement depuis la carte, le joueur doit
+// pouvoir la voir sans quitter cet écran). Tenu à jour à chaque appel de renderStatusBar(), donc
+// toujours synchro avec l'état réel. Un tap sur le niveau ouvre l'onglet Profil, comme un raccourci.
 function renderMapLevelBadge(){
   const el = document.getElementById('mapLevelBadge');
   if(!el) return;
@@ -1184,6 +1210,10 @@ function renderMapLevelBadge(){
   el.innerHTML = `<div class="pill" id="mapLevelBadgeBtn" title="Voir mon profil">
       <div class="badge-circle">${lvl}</div>
       <div><small>Niveau</small><div class="xpbar"><i style="width:${pct}%"></i></div></div>
+    </div>
+    <div class="pill green" title="Nœuds Verts">
+      <div>${icon('noeud', 'style="width:15px;height:15px;stroke:var(--green-dark, var(--green))"')}</div>
+      <div>${state.noeudsVerts}<br><small style="margin-top:-2px;">Nœud Vert</small></div>
     </div>`;
   const btn = document.getElementById('mapLevelBadgeBtn');
   if(btn) btn.addEventListener('click', ()=> switchView('profile'));
@@ -1336,10 +1366,10 @@ function battleSegmentsFor(merchantId, reward){
 }
 function battleRewardText(reward){
   switch(reward.type){
-    case 'xp_small': case 'xp_big': return `+${reward.xp} XP`;
+    case 'xp_small': case 'xp_big': return `+${reward.xp} Réputation`;
     case 'coins_small': case 'coins_big': return `+${reward.coins} tampons`;
-    case 'jackpot': return `JACKPOT ! +${reward.xp} XP et +${reward.coins} tampons`;
-    case 'coupon': return `🎁 ${escapeHtml(reward.couponLabel||'Bon de réduction')} — montrez cet écran en caisse (code ${escapeHtml(reward.couponCode||'')})${reward.xp?` · +${reward.xp} XP`:''}`;
+    case 'jackpot': return `JACKPOT ! +${reward.xp} Réputation et +${reward.coins} tampons`;
+    case 'coupon': return `🎁 ${escapeHtml(reward.couponLabel||'Bon de réduction')} — montrez cet écran en caisse (code ${escapeHtml(reward.couponCode||'')})${reward.xp?` · +${reward.xp} Réputation`:''}`;
     default: return '';
   }
 }
@@ -1526,7 +1556,7 @@ function checkMissions(){
       state.xp += mi.rewardXp||0;
       state.coins += mi.rewardCoins||0;
       changed = true;
-      showToast(`Mission accomplie : ${mi.title}${mi.rewardXp?` (+${mi.rewardXp} XP)`:''}`);
+      showToast(`Mission accomplie : ${mi.title}${mi.rewardXp?` (+${mi.rewardXp} Réputation)`:''}`);
     }
   });
   if(changed){ saveLocal(); renderStatusBar(); }
@@ -1554,7 +1584,7 @@ function renderMissions(){
       <p style="font-size:13px;color:var(--ink-soft);margin:10px 0 6px 0;">${escapeHtml(mi.description||'')}</p>
       <div class="mission-progress"><i style="width:${pct}%;background:${done?'var(--green)':'var(--blue-600)'};"></i></div>
       <p style="font-size:11px;color:var(--ink-faint);font-weight:700;margin:6px 0 0 0;">${progress} / ${target}${badge?' · Badge : '+escapeHtml(badge.label):''}</p>
-      <p style="font-size:12px;font-weight:800;color:var(--gold-dark);margin:6px 0 0 0;">+${mi.rewardXp||0} XP · +${mi.rewardCoins||0} tampons</p>
+      <p style="font-size:12px;font-weight:800;color:var(--gold-dark);margin:6px 0 0 0;">+${mi.rewardXp||0} Réputation · +${mi.rewardCoins||0} tampons</p>
     </div>`;
   }).join('');
   el.innerHTML = `<h1>Missions</h1><p class="sub">Objectifs à accomplir en ville</p>${cards}`;
@@ -1645,7 +1675,7 @@ function collectChest(){
   saveLocal();
   renderStatusBar();
   renderInventory();
-  showToast(`Coffre ${CHEST_COLOR_LABEL[opening.color]} ouvert ! +${reward.xp} XP, +${reward.coins} tampons.`);
+  showToast(`Coffre ${CHEST_COLOR_LABEL[opening.color]} ouvert ! +${reward.xp} Réputation, +${reward.coins} tampons.`);
   checkMissions();
 }
 
@@ -1662,8 +1692,9 @@ function renderProfile(){
     <div style="background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-md);padding:4px 16px;box-shadow:var(--shadow-sm);">
       <div class="profile-stat"><span>Pokemerçants découverts</span><strong>${totalCaught} / ${ACTIVE_MERCHANTS.length}</strong></div>
       <div class="profile-stat"><span>Évolutions réalisées</span><strong>${totalEvolved}</strong></div>
-      <div class="profile-stat"><span>XP total</span><strong>${state.xp}</strong></div>
+      <div class="profile-stat"><span>Réputation totale</span><strong>${state.xp}</strong></div>
       <div class="profile-stat"><span>Tampons en poche</span><strong>${state.coins}</strong></div>
+      <div class="profile-stat"><span>Nœuds Verts en poche</span><strong>${state.noeudsVerts}</strong></div>
     </div>
     <h2 style="font-size:16px;margin:22px 0 0 0;">Badges</h2>
     <div class="badge-grid">${badgeHtml}</div>
@@ -1804,6 +1835,8 @@ async function boot(){
   state.chests = state.chests || [];
   state.chestOpening = state.chestOpening || null;
   state.syncCode = state.syncCode || null;
+  // Version 18 : les sauvegardes créées avant l'ajout du Nœud Vert n'ont pas ce champ.
+  if(state.noeudsVerts==null) state.noeudsVerts = STARTING_NOEUDS;
   await loadGameData();
   applyGameData();
   initMap();

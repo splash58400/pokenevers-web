@@ -433,7 +433,7 @@ function renderMain(){
   } else if(activeTab==='missions'){
     main.innerHTML = `<div class="panel">
       <h2>Missions</h2>
-      <p class="hint">Objectifs à accomplir en jeu, avec récompense (XP, tampons, badge).</p>
+      <p class="hint">Objectifs à accomplir en jeu, avec récompense (Réputation, tampons, badge).</p>
       <button class="btn btn-primary" id="addMissionBtn" style="margin-bottom:12px;">${icon('plus')} Nouvelle mission</button>
       <div id="missionFormSlot"></div>
       <div class="entry-list" id="missionList" style="max-height:none;"></div>
@@ -467,8 +467,9 @@ function renderMain(){
 }
 /* ============================= COFFRES ============================= */
 // Les taux de trouvaille des clés/coffres aux points d'intérêt restent fixés côté jeu (voir
-// index.html) ; seule la récompense obtenue à l'ouverture (XP + tampons par couleur) est
-// réglable ici, comme demandé.
+// index.html) ; seule la récompense obtenue à l'ouverture (Réputation + tampons par couleur) est
+// réglable ici, comme demandé. Choix (Version 18) : les coffres ne donnent pas de Nœud Vert,
+// seuls les points d'intérêt en donnent — pour garder une source de capture unique et lisible.
 function renderChestsPanel(){
   const main = document.getElementById('mainArea');
   const rows = CHEST_COLORS.map(c=>{
@@ -476,7 +477,7 @@ function renderChestsPanel(){
     return `<div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line);">
       <span style="width:20px;height:20px;border-radius:50%;background:${CHEST_COLOR_SWATCH[c]};box-shadow:0 0 0 2px var(--line) inset;flex:none;"></span>
       <div style="min-width:130px;flex:1;font-weight:800;">${CHEST_COLOR_LABEL[c]}<span class="hint" style="display:block;font-weight:600;margin:2px 0 0 0;">Ouverture : ${CHEST_OPEN_LABEL[c]}</span></div>
-      <div class="field" style="flex:1;min-width:140px;"><label>XP à l'ouverture</label><input type="number" min="0" id="f_chest_xp_${c}" value="${r.xp}"></div>
+      <div class="field" style="flex:1;min-width:140px;"><label>Réputation à l'ouverture</label><input type="number" min="0" id="f_chest_xp_${c}" value="${r.xp}"></div>
       <div class="field" style="flex:1;min-width:140px;"><label>Tampons à l'ouverture</label><input type="number" min="0" id="f_chest_coins_${c}" value="${r.coins}"></div>
     </div>`;
   }).join('');
@@ -586,12 +587,12 @@ function renderMerchantForm(){
     <div class="section-title">Combat en boutique</div>
     <div class="shiny-box">
       <div class="field checkbox"><input type="checkbox" id="f_battle_enabled" ${m.battleEnabled?'checked':''}><label for="f_battle_enabled">Activer le combat pour ce commerçant</label></div>
-      <p class="small-note">Le code ci-dessous doit être écrit/affiché chez le commerçant (carton en caisse, QR code…). Un joueur sur place peut le saisir dans le jeu pour tenter sa chance à la roue (XP, tampons, et un bon de réduction s'il y en a un ci-dessous). Il doit être physiquement à proximité du commerçant pour que le code fonctionne, et ce code n'est jamais envoyé au jeu tant qu'il n'est pas validé — un joueur ne peut pas le voir en fouillant dans le jeu.</p>
+      <p class="small-note">Le code ci-dessous doit être écrit/affiché chez le commerçant (carton en caisse, QR code…). Un joueur sur place peut le saisir dans le jeu pour tenter sa chance à la roue (Réputation, tampons, et un bon de réduction s'il y en a un ci-dessous). Il doit être physiquement à proximité du commerçant pour que le code fonctionne, et ce code n'est jamais envoyé au jeu tant qu'il n'est pas validé — un joueur ne peut pas le voir en fouillant dans le jeu.</p>
       <div class="form-grid" style="margin-top:10px;">
         <div class="field"><label>Code secret</label><div class="icon-field-row"><input id="f_battle_code" value="${escapeHtml(m.battleCode||'')}" placeholder="Ex. NEVERS7"><button class="btn btn-ghost btn-sm" id="genBattleCodeBtn" type="button">Générer</button></div></div>
         <div class="field"><label>Bon de réduction (optionnel)</label><input id="f_battle_coupon" value="${escapeHtml(m.battleCouponLabel||'')}" placeholder="Ex. -10% sur un achat"></div>
       </div>
-      <p class="small-note">Laissez le bon de réduction vide pour un combat qui ne rapporte que de l'XP et des tampons. S'il est rempli, il sort de temps en temps sur la roue en plus des autres gains.</p>
+      <p class="small-note">Laissez le bon de réduction vide pour un combat qui ne rapporte que de la Réputation et des tampons. S'il est rempli, il sort de temps en temps sur la roue en plus des autres gains.</p>
     </div>
 
     <div class="field checkbox" style="margin-top:14px;"><input type="checkbox" id="f_active" ${m.active!==false?'checked':''}><label for="f_active">Commerçant actif (visible en jeu)</label></div>
@@ -674,7 +675,7 @@ function renderPoiList(){
     <div class="entry-icon" style="--rarity:var(--gold-dark);">${icon(p.icon||'stall')}</div>
     <div class="entry-main">
       <div class="entry-title">${escapeHtml(p.name)||'(sans nom)'}</div>
-      <div class="entry-sub">${p.lat!=null? p.lat.toFixed(4)+', '+p.lon.toFixed(4) : 'non placé'} · +${p.rewardXp||15} XP</div>
+      <div class="entry-sub">${p.lat!=null? p.lat.toFixed(4)+', '+p.lon.toFixed(4) : 'non placé'} · +${p.rewardXp||15} Réputation · +${p.rewardNoeudsMin!=null?p.rewardNoeudsMin:1}-${p.rewardNoeudsMax!=null?p.rewardNoeudsMax:3} Nœud Vert</div>
     </div>
     <button class="btn btn-sm btn-danger delbtn" data-id="${p.id}">${icon('trash')}</button>
   </div>`).join('');
@@ -691,7 +692,7 @@ function deletePoi(id){
 }
 function renderPoiForm(){
   const isNew = editingPoiId==='new';
-  const p = isNew ? {id:uid('p'), name:'', icon:'stall', lat:null, lon:null, rewardCoinsMin:2, rewardCoinsMax:4, rewardXp:15, active:true} : data.pois.find(x=>x.id===editingPoiId);
+  const p = isNew ? {id:uid('p'), name:'', icon:'stall', lat:null, lon:null, rewardCoinsMin:2, rewardCoinsMax:4, rewardXp:15, rewardNoeudsMin:1, rewardNoeudsMax:3, active:true} : data.pois.find(x=>x.id===editingPoiId);
   if(!p){ editingPoiId=null; document.getElementById('poiFormSlot').innerHTML=''; return; }
   const slot = document.getElementById('poiFormSlot');
   slot.innerHTML = `<div class="form-card">
@@ -700,7 +701,9 @@ function renderPoiForm(){
       <div class="field"><label>Icône</label><div class="icon-field-row"><div class="icon-preview" id="f_picon_preview"></div>${iconSelectHtml('f_picon', p.icon)}</div></div>
       <div class="field"><label>Tampons min</label><input id="f_pcmin" type="number" min="0" value="${p.rewardCoinsMin}"></div>
       <div class="field"><label>Tampons max</label><input id="f_pcmax" type="number" min="0" value="${p.rewardCoinsMax}"></div>
-      <div class="field"><label>XP par visite</label><input id="f_pxp" type="number" min="0" value="${p.rewardXp}"></div>
+      <div class="field"><label>Réputation par visite</label><input id="f_pxp" type="number" min="0" value="${p.rewardXp}"></div>
+      <div class="field"><label>Nœud Vert min</label><input id="f_pnmin" type="number" min="0" value="${p.rewardNoeudsMin!=null?p.rewardNoeudsMin:1}"></div>
+      <div class="field"><label>Nœud Vert max</label><input id="f_pnmax" type="number" min="0" value="${p.rewardNoeudsMax!=null?p.rewardNoeudsMax:3}"></div>
     </div>
     <div class="section-title">Position sur la carte</div>
     <div class="thumb-row">
@@ -724,6 +727,8 @@ function renderPoiForm(){
     p.rewardCoinsMin = Number(document.getElementById('f_pcmin').value)||0;
     p.rewardCoinsMax = Number(document.getElementById('f_pcmax').value)||0;
     p.rewardXp = Number(document.getElementById('f_pxp').value)||0;
+    p.rewardNoeudsMin = Number(document.getElementById('f_pnmin').value)||0;
+    p.rewardNoeudsMax = Number(document.getElementById('f_pnmax').value)||0;
     p.active = document.getElementById('f_pactive').checked;
     if(isNew) data.pois.push(p);
     editingPoiId=null; clearPlacement();
@@ -812,7 +817,7 @@ function renderMissionList(){
     <div class="entry-icon"><span style="--rarity:var(--blue-600);">${icon('flag')}</span></div>
     <div class="entry-main">
       <div class="entry-title">${escapeHtml(mi.title)}</div>
-      <div class="entry-sub">${(MISSION_TYPES.find(t=>t.v===mi.type)||{}).label||mi.type} · +${mi.rewardXp||0} XP, +${mi.rewardCoins||0} tampons</div>
+      <div class="entry-sub">${(MISSION_TYPES.find(t=>t.v===mi.type)||{}).label||mi.type} · +${mi.rewardXp||0} Réputation, +${mi.rewardCoins||0} tampons</div>
     </div>
     <button class="btn btn-sm btn-danger delbtn" data-id="${mi.id}">${icon('trash')}</button>
   </div>`).join('');
@@ -838,7 +843,7 @@ function renderMissionForm(){
     </div>
     <div class="field" style="margin-top:12px;"><label>Description</label><textarea id="f_midesc" placeholder="Affichée au joueur">${escapeHtml(mi.description)}</textarea></div>
     <div class="form-grid" style="margin-top:12px;">
-      <div class="field"><label>Récompense XP</label><input id="f_mixp" type="number" min="0" value="${mi.rewardXp||0}"></div>
+      <div class="field"><label>Récompense Réputation</label><input id="f_mixp" type="number" min="0" value="${mi.rewardXp||0}"></div>
       <div class="field"><label>Récompense tampons</label><input id="f_micoins" type="number" min="0" value="${mi.rewardCoins||0}"></div>
       <div class="field"><label>Badge débloqué (optionnel)</label><select id="f_mibadge"><option value="">— aucun —</option>${data.badges.map(b=>`<option value="${b.id}" ${b.id===mi.rewardBadgeId?'selected':''}>${escapeHtml(b.label)}</option>`).join('')}</select></div>
     </div>
