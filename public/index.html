@@ -159,7 +159,10 @@ button{font-family:inherit;}
 .smarker.balloon .badge svg{stroke:#c0392b; fill:#e0483e;}
 .smarker.balloon .badge.pop{animation:balloonPop .3s ease-out forwards;}
 @keyframes balloonPop{ 0%{transform:scale(1); opacity:1;} 60%{transform:scale(1.35); opacity:.7;} 100%{transform:scale(1.6); opacity:0;} }
-#particleLayer{position:fixed; inset:0; z-index:500; pointer-events:none; overflow:hidden;}
+/* z-index 900 : au-dessus de tous les autres calques (onboarding 800, écran de capture 700,
+   fond des feuilles/tirages 600) — nécessaire depuis la Version 23, les confettis de capture
+   réussie devant rester visibles par-dessus l'écran de capture qui les entoure. */
+#particleLayer{position:fixed; inset:0; z-index:900; pointer-events:none; overflow:hidden;}
 .burst-particle{position:absolute; border-radius:50%; transform:translate(-50%,-50%); animation:burstFly .7s cubic-bezier(.15,.7,.3,1) forwards; box-shadow:0 0 4px rgba(0,0,0,.15);}
 @keyframes burstFly{
   0%{transform:translate(-50%,-50%) translate(0,0) scale(1); opacity:1;}
@@ -167,6 +170,11 @@ button{font-family:inherit;}
 }
 .burst-ring{position:absolute; border-radius:50%; border:3px solid; transform:translate(-50%,-50%) scale(.3); opacity:.85; animation:burstRing .5s ease-out forwards;}
 @keyframes burstRing{ to{ transform:translate(-50%,-50%) scale(2.6); opacity:0; } }
+.burst-confetti{position:absolute; border-radius:1px; transform:translate(-50%,-50%) rotate(0deg); animation:confettiFly .9s cubic-bezier(.15,.7,.3,1) forwards; box-shadow:0 0 3px rgba(0,0,0,.12);}
+@keyframes confettiFly{
+  0%{transform:translate(-50%,-50%) translate(0,0) rotate(0deg); opacity:1;}
+  100%{transform:translate(-50%,-50%) translate(var(--dx),var(--dy)) rotate(var(--rot)); opacity:0;}
+}
 .smarker.shiny .badge{box-shadow:0 0 0 3px var(--mc), 0 0 16px 4px color-mix(in srgb, var(--mc) 55%, transparent), var(--shadow-lg);}
 .shiny-spark{position:absolute; top:-9px; right:-7px; font-size:15px; filter:drop-shadow(0 1px 1px rgba(0,0,0,.35)); animation:spark-pulse 1.6s ease-in-out infinite;}
 @keyframes spark-pulse{0%,100%{transform:scale(1);}50%{transform:scale(1.3);}}
@@ -414,6 +422,13 @@ input.text-input:focus{outline:none; border-color:var(--blue-600);}
 .chest-card .btn{font-size:11px; padding:8px 6px;}
 
 /* ---------- boutique (Version 19) ---------- */
+.shop-balance{
+  display:flex; align-items:center; gap:8px; width:fit-content; margin:0 0 12px 0;
+  background:linear-gradient(135deg, color-mix(in srgb, var(--gold) 18%, var(--surface)), var(--surface) 70%);
+  border:1.5px solid color-mix(in srgb, var(--gold) 55%, var(--line));
+  border-radius:var(--radius-sm); padding:8px 14px 8px 10px; box-shadow:var(--shadow-sm);
+}
+.shop-balance strong{font-family:"Fredoka"; font-size:15px;}
 .shop-key-card{
   display:flex; flex-direction:column; align-items:center; gap:4px;
   background:var(--surface); border:1.5px solid color-mix(in srgb, var(--cc) 55%, var(--line));
@@ -503,6 +518,23 @@ const ICONS = {
   balloon:'<path d="M12 3.2c-3.4 0-6 2.9-6 6.4 0 3.9 3 7.4 5.2 8.9.5.3 1.1.3 1.6 0 2.2-1.5 5.2-5 5.2-8.9 0-3.5-2.6-6.4-6-6.4Z"/><path d="M12 18.5v2.3M10.7 21.3h2.6" stroke-linecap="round"/>'
 };
 function icon(name, extra){ return `<svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" ${extra||''}>${ICONS[name]||ICONS.star}</svg>`; }
+// Petite image de pièce d'or (Version 23, demande de Jérémy pour remplacer les "tampons" par des
+// "pièces") — un dégradé doré plutôt qu'une simple icône au trait, pour bien la distinguer des
+// autres pictogrammes monochromes du jeu. L'identifiant du dégradé est suffixé d'un compteur pour
+// rester valide même si plusieurs pièces sont affichées en même temps sur le même écran.
+let _coinIconSeq = 0;
+function coinIcon(size){
+  size = size || 18;
+  const gid = 'coinGrad'+(_coinIconSeq++);
+  return `<svg viewBox="0 0 24 24" width="${size}" height="${size}" style="display:block;">
+    <defs><radialGradient id="${gid}" cx="35%" cy="30%" r="75%">
+      <stop offset="0%" stop-color="#fff3c4"/><stop offset="55%" stop-color="#eab545"/><stop offset="100%" stop-color="#a97a1f"/>
+    </radialGradient></defs>
+    <circle cx="12" cy="12" r="9.4" fill="url(#${gid})" stroke="#8a611a" stroke-width="1.1"/>
+    <circle cx="12" cy="12" r="6.4" fill="none" stroke="#8a611a" stroke-width="0.9" opacity="0.5"/>
+    <path d="M12 8.2v7.6M9.8 9.6h4.4M9.8 14.4h4.4" stroke="#8a611a" stroke-width="1" stroke-linecap="round" opacity="0.65"/>
+  </svg>`;
+}
 
 /* ============================= GEOGRAPHY ============================= */
 // Clé API MapTiler de Jérémy (compte gratuit) — sert uniquement à charger un style de
@@ -563,12 +595,12 @@ const CHEST_OPEN_MS = {
 // Réglable depuis le panel admin (gamedata.dropConfig, Version 20) — DEFAULT_* sert de repli.
 const DEFAULT_CHEST_DROP_WEIGHTS = {jaune:50, vert:27, bleu:14, violet:7, noir:2};
 // Probabilité, à chaque point d'intérêt actionné (spinPoi), de trouver une clé et/ou un coffre —
-// indépendamment l'une de l'autre, en plus de la récompense XP/tampons habituelle du POI.
+// indépendamment l'une de l'autre, en plus de la récompense XP/pièces habituelle du POI.
 // Réglable depuis le panel admin (gamedata.dropConfig, Version 20) — DEFAULT_* sert de repli.
 const DEFAULT_CHEST_FIND_CHANCE = {key:0.09, chest:0.05};
 let ACTIVE_CHEST_DROP_WEIGHTS = DEFAULT_CHEST_DROP_WEIGHTS;
 let ACTIVE_CHEST_FIND_CHANCE = DEFAULT_CHEST_FIND_CHANCE;
-// Récompense par défaut à l'ouverture d'un coffre (XP + tampons) — réglable depuis le panel
+// Récompense par défaut à l'ouverture d'un coffre (XP + pièces) — réglable depuis le panel
 // admin (gamedata.chestRewards), ces valeurs ne servent que si aucune configuration n'est
 // encore déployée ou si une couleur manque dans le fichier.
 const DEFAULT_CHEST_REWARDS = {
@@ -578,9 +610,9 @@ const DEFAULT_CHEST_REWARDS = {
 let ACTIVE_CHEST_REWARDS = DEFAULT_CHEST_REWARDS;
 
 /* ============================= BOUTIQUE ============================= */
-// Les tampons n'avaient jusqu'ici aucune utilité (accumulés sans jamais être dépensés) —
+// Les pièces n'avaient jusqu'ici aucune utilité (accumulés sans jamais être dépensés) —
 // signalé par Jérémy. La boutique leur donne enfin un usage : acheter des clés, terminer
-// immédiatement l'ouverture d'un coffre en cours, ou échanger des tampons contre des Nœuds
+// immédiatement l'ouverture d'un coffre en cours, ou échanger des pièces contre des Nœuds
 // Verts. Prix par défaut ci-dessous, réglables depuis le panel admin (gamedata.shopConfig),
 // même principe que ACTIVE_CHEST_REWARDS juste au-dessus.
 const DEFAULT_KEY_PRICES = {jaune:20, vert:50, bleu:110, violet:240, noir:700};
@@ -609,7 +641,7 @@ function fmtDuration(ms){
 /* ============================= BALLONS ============================= */
 // Bonus éphémère demandé par Jérémy : un ballon rouge apparaît de temps en temps, à un endroit
 // aléatoire proche du joueur, et disparaît tout seul s'il n'est pas éclaté à temps. Un clic dessus
-// donne une récompense tampons/XP/Nœud Vert, comme un point d'intérêt (choix confirmé par Jérémy).
+// donne une récompense pièces/XP/Nœud Vert, comme un point d'intérêt (choix confirmé par Jérémy).
 // Toutes les valeurs ci-dessous sont réglables depuis le panel admin (gamedata.balloonConfig,
 // Version 21) — DEFAULT_BALLOON_CONFIG sert de repli si aucun réglage n'est encore déployé.
 const DEFAULT_BALLOON_CONFIG = {
@@ -670,7 +702,7 @@ const EVENTS = [
   { id:'dernier-bal', name:"Le Dernier Bal — Nevers Hanté", icon:'star',
     start:d(2026,10,31), end:d(2026,11,1,23,59),
     desc:"Pour l'évènement Halloween d'ICOO Games à l'Espace des Saules : des versions hantées des commerçants apparaissent en ville.",
-    bonus:"x2 tampons de fidélité sur toutes les captures" },
+    bonus:"x2 pièces de fidélité sur toutes les captures" },
   { id:'inventaire-faience', name:"Grand Inventaire de Faïence", icon:'vase',
     start:d(2026,12,5), end:d(2026,12,20,23,59),
     desc:"Une saison spéciale où le Maître Faïencier de Nevers se montre bien plus souvent qu'à l'accoutumée.",
@@ -1041,6 +1073,10 @@ function spawnParticles(x, y, colors, opts){
   opts = opts || {};
   const count = opts.count!=null ? opts.count : 14;
   const spread = opts.spread!=null ? opts.spread : 70;
+  // Mode "confetti" (Version 23, demandé par Jérémy pour un tap sur un point d'intérêt et une
+  // capture réussie) : des petits rectangles qui tournent en tombant, plutôt que de simples ronds —
+  // un rendu plus festif pour ces deux moments de récompense.
+  const confetti = !!opts.confetti;
   let layer = document.getElementById('particleLayer');
   if(!layer){
     layer = document.createElement('div');
@@ -1049,20 +1085,29 @@ function spawnParticles(x, y, colors, opts){
   }
   for(let i=0;i<count;i++){
     const p = document.createElement('div');
-    p.className = 'burst-particle';
     const angle = Math.random()*Math.PI*2;
     const dist = spread*(0.5+Math.random()*0.5);
     const dx = Math.cos(angle)*dist, dy = Math.sin(angle)*dist;
-    const size = 5+Math.random()*5;
     const color = colors[Math.floor(Math.random()*colors.length)];
     p.style.left = x+'px'; p.style.top = y+'px';
-    p.style.width = size+'px'; p.style.height = size+'px';
-    p.style.background = color;
     p.style.setProperty('--dx', dx+'px');
     p.style.setProperty('--dy', dy+'px');
+    if(confetti){
+      p.className = 'burst-confetti';
+      const w = 5+Math.random()*4, h = 8+Math.random()*6;
+      p.style.width = w+'px'; p.style.height = h+'px';
+      p.style.background = color;
+      const rot = (Math.random()<0.5?-1:1)*(320+Math.random()*400);
+      p.style.setProperty('--rot', rot+'deg');
+    } else {
+      p.className = 'burst-particle';
+      const size = 5+Math.random()*5;
+      p.style.width = size+'px'; p.style.height = size+'px';
+      p.style.background = color;
+    }
     layer.appendChild(p);
     p.addEventListener('animationend', ()=> p.remove(), {once:true});
-    setTimeout(()=>{ if(p.parentNode) p.remove(); }, 1000); // filet de sécurité si l'évènement ne se déclenche pas
+    setTimeout(()=>{ if(p.parentNode) p.remove(); }, 1300); // filet de sécurité si l'évènement ne se déclenche pas
   }
   // Anneau qui s'étend et s'efface (petite "onde de choc") — réservé aux moments plus marquants
   // (ouverture d'un coffre) pour bien les distinguer d'un simple tirage à un point d'intérêt.
@@ -1094,13 +1139,16 @@ function spinPoi(p,i){
   }
   state.poiSpins[key]=Date.now();
   state.totalPoiSpins = (state.totalPoiSpins||0)+1;
-  // Petite gerbe de particules dorées au point exact du marqueur, en plus de la rotation de l'icône
-  // (déjà déclenchée par spinPoiIcon) — seulement quand la récompense est vraiment accordée, pas sur
-  // un tap bloqué par le temps de recharge.
+  // Gerbe de confettis au point exact du marqueur, en plus de la rotation de l'icône (déjà
+  // déclenchée par spinPoiIcon) — seulement quand la récompense est vraiment accordée, pas sur
+  // un tap bloqué par le temps de recharge. Passée en mode confettis et bien plus fournie en
+  // Version 23 (demande de Jérémy, l'ancienne gerbe dorée étant jugée trop discrète) ; couleurs
+  // reprenant les trois récompenses distribuées par un point d'intérêt (or = pièces, blanc = exp,
+  // vert = Nœud Vert).
   const poiMarkerEl = poiMarkers[i] && poiMarkers[i].getElement ? poiMarkers[i].getElement() : null;
   if(poiMarkerEl){
     const c = elementCenter(poiMarkerEl);
-    spawnParticles(c.x, c.y, ['#eab545','#ffd873','#a97a1f','#fff3d6'], {count:16, spread:65});
+    spawnParticles(c.x, c.y, ['#eab545','#ffd873','#a97a1f','#fff3d6','#2f9e52','#4fc3f7'], {count:34, spread:95, confetti:true});
   }
   const cMin = p.rewardCoinsMin!=null?p.rewardCoinsMin:2, cMax = p.rewardCoinsMax!=null?p.rewardCoinsMax:4;
   const mult = eventBonusMultiplier();
@@ -1115,7 +1163,7 @@ function spinPoi(p,i){
   saveLocal();
   renderStatusBar();
   if(activeView==='inventory') renderInventory();
-  let msg = `${p.name} : +${gained} tampons, +${noeudsGained} Nœud Vert, +${xpGain} exp !`;
+  let msg = `${p.name} : +${gained} pièces, +${noeudsGained} Nœud Vert, +${xpGain} exp !`;
   if(findMsgs.length) msg += ' ' + findMsgs.join(' ');
   showToast(msg);
   checkMissions();
@@ -1204,7 +1252,7 @@ function onBalloonTap(b){
   } else {
     renderBalloonMarkers();
   }
-  showToast(`🎈 Ballon éclaté : +${gained} tampons, +${noeudsGained} Nœud Vert, +${xpGain} exp !`);
+  showToast(`🎈 Ballon éclaté : +${gained} pièces, +${noeudsGained} Nœud Vert, +${xpGain} exp !`);
   checkMissions();
 }
 
@@ -1350,8 +1398,16 @@ function doThrow(){
         document.getElementById('captureDoneBtn').onclick = closeCapture;
       } else {
         applyCapture(capture.species, capture.spawnUid);
-        wrap.innerHTML = `<div class="capture-result success">Capturé !</div><p class="capture-hint">+${RARITY_XP[capture.species.rarity]} exp · +${RARITY_CANDY[capture.species.rarity]} tampons</p><button class="btn btn-primary" id="captureDoneBtn" style="margin-top:10px;">Continuer</button>`;
+        wrap.innerHTML = `<div class="capture-result success">Capturé !</div><p class="capture-hint">+${RARITY_XP[capture.species.rarity]} exp · +${RARITY_CANDY[capture.species.rarity]} pièces</p><button class="btn btn-primary" id="captureDoneBtn" style="margin-top:10px;">Continuer</button>`;
         document.getElementById('captureDoneBtn').onclick = closeCapture;
+        // Confettis de célébration (Version 23, demande de Jérémy) sur une capture réellement
+        // terminée (toutes les manches gagnées) — un moment plus marquant qu'un simple point
+        // d'intérêt, avec une palette multicolore festive plutôt que la palette dorée réservée
+        // aux récompenses de pièces.
+        if(portrait){
+          const c = elementCenter(portrait);
+          spawnParticles(c.x, c.y, ['#eab545','#ff6b6b','#4fc3f7','#81c784','#c77dff','#ffd873'], {count:42, spread:130, confetti:true});
+        }
       }
     } else {
       const outOfNoeuds = state.noeudsVerts<=0;
@@ -1389,8 +1445,8 @@ function renderStatusBar(){
       <div><small>Niveau</small><div class="xpbar"><i style="width:${pct}%"></i></div></div>
     </div>
     <div class="pill gold">
-      <div>${icon('star', 'style="width:15px;height:15px;stroke:var(--gold-dark)"')}</div>
-      <div>${state.coins}<br><small style="margin-top:-2px;">tampons</small></div>
+      <div>${coinIcon(17)}</div>
+      <div>${state.coins}<br><small style="margin-top:-2px;">pièces</small></div>
     </div>
     <div class="pill green">
       <div>${icon('noeud', 'style="width:15px;height:15px;stroke:var(--green-dark, var(--green))"')}</div>
@@ -1461,7 +1517,7 @@ function openDexDetail(spId){
       <h2 class="capture-name">${caught? escapeHtml(sp.name||stage.name) : '???'}</h2>
       ${(caught && sp.name && sp.name!==stage.name)?`<p class="capture-stage-name">${escapeHtml(stage.name)}</p>`:''}
       <p class="capture-hint" style="max-width:320px;">${caught? escapeHtml(sp.description||stage.desc) : "Pas encore rencontré. Explorez la carte pour le trouver."}</p>
-      ${caught? `<p class="capture-hint">Tampons : <strong style="color:var(--ink);">${entry.candy}</strong>${stage.need!=null?` / ${stage.need} pour évoluer`:''}</p>`:''}
+      ${caught? `<p class="capture-hint">Pièces : <strong style="color:var(--ink);">${entry.candy}</strong>${stage.need!=null?` / ${stage.need} pour évoluer`:''}</p>`:''}
       ${nextStage? `<button class="btn ${canEvolve?'btn-gold':'btn-ghost'}" id="evolveBtn" ${canEvolve?'':'disabled'} style="margin-top:8px;">Faire évoluer${canEvolve?` → ${escapeHtml(nextStage.name)}`:''}</button>`:''}
       ${(caught && sp.battleEnabled)? `<button class="btn btn-gold" id="battleBtn" style="margin-top:8px;">⚔️ Défier ${escapeHtml(sp.name||stage.name)}</button>`:''}
       <button class="btn btn-ghost" id="closeSheetBtn" style="margin-top:8px;">Fermer</button>
@@ -1569,8 +1625,8 @@ function battleSegmentsFor(merchantId, reward){
 function battleRewardText(reward){
   switch(reward.type){
     case 'xp_small': case 'xp_big': return `+${reward.xp} exp`;
-    case 'coins_small': case 'coins_big': return `+${reward.coins} tampons`;
-    case 'jackpot': return `JACKPOT ! +${reward.xp} exp et +${reward.coins} tampons`;
+    case 'coins_small': case 'coins_big': return `+${reward.coins} pièces`;
+    case 'jackpot': return `JACKPOT ! +${reward.xp} exp et +${reward.coins} pièces`;
     case 'coupon': return `🎁 ${escapeHtml(reward.couponLabel||'Bon de réduction')} — montrez cet écran en caisse (code ${escapeHtml(reward.couponCode||'')})${reward.xp?` · +${reward.xp} exp`:''}`;
     default: return '';
   }
@@ -1830,7 +1886,7 @@ function renderMissions(){
       <p style="font-size:13px;color:var(--ink-soft);margin:10px 0 6px 0;">${escapeHtml(mi.description||'')}</p>
       <div class="mission-progress"><i style="width:${pct}%;background:${done?'var(--green)':'var(--blue-600)'};"></i></div>
       <p style="font-size:11px;color:var(--ink-faint);font-weight:700;margin:6px 0 0 0;">${progress} / ${target}${badge?' · Badge : '+escapeHtml(badge.label):''}</p>
-      <p style="font-size:12px;font-weight:800;color:var(--gold-dark);margin:6px 0 0 0;">+${mi.rewardXp||0} exp · +${mi.rewardCoins||0} tampons</p>
+      <p style="font-size:12px;font-weight:800;color:var(--gold-dark);margin:6px 0 0 0;">+${mi.rewardXp||0} exp · +${mi.rewardCoins||0} pièces</p>
     </div>`;
   }).join('');
   el.innerHTML = `<h1>Missions</h1><p class="sub">Objectifs à accomplir en ville</p>${cards}`;
@@ -1891,7 +1947,7 @@ function renderInventory(){
     return `<div class="shop-key-card" style="--cc:var(--chest-${c});">
       <div class="key-chip-icon">${icon('key')}</div>
       <div class="key-chip-label">${CHEST_COLOR_LABEL[c]}</div>
-      <div class="shop-key-price">${price} tampons</div>
+      <div class="shop-key-price">${price} pièces</div>
       <button class="btn ${afford?'btn-primary':'btn-ghost'} shop-buy-key-btn" data-color="${c}" ${afford?'':'disabled'}>Acheter</button>
     </div>`;
   }).join('');
@@ -1902,14 +1958,14 @@ function renderInventory(){
     skipRowHtml = `<div class="shop-row-card" style="--cc:var(--chest-${opening.color});">
       <div class="shop-row-icon">${icon('chest')}</div>
       <div class="shop-row-info"><strong>Terminer le coffre ${CHEST_COLOR_LABEL[opening.color]}</strong><span>Récupérez-le tout de suite, sans attendre.</span></div>
-      <button class="btn ${afford?'btn-gold':'btn-ghost'}" id="shopSkipChestBtn" ${afford?'':'disabled'}>${skipPrice} tampons</button>
+      <button class="btn ${afford?'btn-gold':'btn-ghost'}" id="shopSkipChestBtn" ${afford?'':'disabled'}>${skipPrice} pièces</button>
     </div>`;
   }
   const noeudAfford = state.coins >= ACTIVE_NOEUD_PRICE;
   const noeudRowHtml = `<div class="shop-row-card" style="--cc:var(--green);">
     <div class="shop-row-icon">${icon('noeud')}</div>
     <div class="shop-row-info"><strong>1 Nœud Vert</strong><span>Vous en avez ${state.noeudsVerts} en poche.</span></div>
-    <button class="btn ${noeudAfford?'btn-primary':'btn-ghost'}" id="shopBuyNoeudBtn" ${noeudAfford?'':'disabled'}>${ACTIVE_NOEUD_PRICE} tampons</button>
+    <button class="btn ${noeudAfford?'btn-primary':'btn-ghost'}" id="shopBuyNoeudBtn" ${noeudAfford?'':'disabled'}>${ACTIVE_NOEUD_PRICE} pièces</button>
   </div>`;
 
   el.innerHTML = `<h1>Inventaire</h1><p class="sub">Clés et coffres trouvés aux points d'intérêt</p>
@@ -1919,7 +1975,8 @@ function renderInventory(){
     <h2 style="font-size:14px;margin:18px 0 10px 0;">Coffres</h2>
     ${chestsHtml}
     <div class="info-note" style="margin-top:18px;">Un seul coffre peut être ouvert à la fois. Lancer l'ouverture consomme une clé de la même couleur ; le minuteur va de 30 min (Jaune) à 12 h (Noir).</div>
-    <h2 style="font-size:14px;margin:22px 0 10px 0;">Boutique <span style="font-weight:600;color:var(--ink-faint);">(contre des tampons)</span></h2>
+    <h2 style="font-size:14px;margin:22px 0 10px 0;">Boutique <span style="font-weight:600;color:var(--ink-faint);">(contre des pièces)</span></h2>
+    <div class="shop-balance">${coinIcon(20)}<span>Vous avez <strong>${state.coins}</strong> pièce${state.coins===1?'':'s'}</span></div>
     <div class="key-row">${shopKeysHtml}</div>
     ${skipRowHtml}
     ${noeudRowHtml}`;
@@ -1939,35 +1996,35 @@ function renderInventory(){
 }
 function buyKey(color){
   const price = ACTIVE_KEY_PRICES[color];
-  if(state.coins < price){ showToast(`Pas assez de tampons (il faut ${price}).`); return; }
+  if(state.coins < price){ showToast(`Pas assez de pièces (il faut ${price}).`); return; }
   state.coins -= price;
   state.keys[color] = (state.keys[color]||0)+1;
   saveLocal();
   renderStatusBar();
   renderInventory();
-  showToast(`Clé ${CHEST_COLOR_LABEL[color]} achetée (−${price} tampons).`);
+  showToast(`Clé ${CHEST_COLOR_LABEL[color]} achetée (−${price} pièces).`);
 }
 function buySkipChest(){
   const opening = state.chestOpening;
   if(!opening || Date.now() >= opening.readyAt) return;
   const price = ACTIVE_CHEST_SKIP_PRICES[opening.color];
-  if(state.coins < price){ showToast(`Pas assez de tampons (il faut ${price}).`); return; }
+  if(state.coins < price){ showToast(`Pas assez de pièces (il faut ${price}).`); return; }
   state.coins -= price;
   opening.readyAt = Date.now();
   saveLocal();
   renderStatusBar();
   renderInventory();
-  showToast(`Ouverture terminée immédiatement (−${price} tampons) !`);
+  showToast(`Ouverture terminée immédiatement (−${price} pièces) !`);
 }
 function buyNoeud(){
   const price = ACTIVE_NOEUD_PRICE;
-  if(state.coins < price){ showToast(`Pas assez de tampons (il faut ${price}).`); return; }
+  if(state.coins < price){ showToast(`Pas assez de pièces (il faut ${price}).`); return; }
   state.coins -= price;
   state.noeudsVerts += 1;
   saveLocal();
   renderStatusBar();
   renderInventory();
-  showToast(`+1 Nœud Vert (−${price} tampons) !`);
+  showToast(`+1 Nœud Vert (−${price} pièces) !`);
 }
 function startChestOpen(chestId){
   if(state.chestOpening){ showToast('Un coffre est déjà en cours d’ouverture.'); return; }
@@ -2004,7 +2061,7 @@ function collectChest(){
     const c = elementCenter(openingIconEl);
     spawnParticles(c.x, c.y, burstColors, {count:26, spread:110, ring:true, ringSize:70});
   }
-  showToast(`Coffre ${CHEST_COLOR_LABEL[opening.color]} ouvert ! +${reward.xp} exp, +${reward.coins} tampons.`);
+  showToast(`Coffre ${CHEST_COLOR_LABEL[opening.color]} ouvert ! +${reward.xp} exp, +${reward.coins} pièces.`);
   checkMissions();
 }
 
@@ -2022,7 +2079,7 @@ function renderProfile(){
       <div class="profile-stat"><span>Pokemerçants découverts</span><strong>${totalCaught} / ${ACTIVE_MERCHANTS.length}</strong></div>
       <div class="profile-stat"><span>Évolutions réalisées</span><strong>${totalEvolved}</strong></div>
       <div class="profile-stat"><span>Expérience totale</span><strong>${state.xp}</strong></div>
-      <div class="profile-stat"><span>Tampons en poche</span><strong>${state.coins}</strong></div>
+      <div class="profile-stat"><span>Pièces en poche</span><strong>${state.coins}</strong></div>
       <div class="profile-stat"><span>Nœuds Verts en poche</span><strong>${state.noeudsVerts}</strong></div>
     </div>
     <h2 style="font-size:16px;margin:22px 0 0 0;">Badges</h2>

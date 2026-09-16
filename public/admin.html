@@ -256,7 +256,7 @@ function defaultChestRewards(){
     violet:{xp:300, coins:130}, noir:{xp:900, coins:400},
   };
 }
-// Boutique (Version 19) : prix par défaut, en tampons — mêmes valeurs que côté jeu
+// Boutique (Version 19) : prix par défaut, en pièces — mêmes valeurs que côté jeu
 // (public/index.html, DEFAULT_KEY_PRICES / DEFAULT_CHEST_SKIP_PRICES / DEFAULT_NOEUD_PRICE),
 // à garder synchronisées si l'une des deux est modifiée.
 function defaultShopConfig(){
@@ -496,7 +496,7 @@ function renderMain(){
   } else if(activeTab==='missions'){
     main.innerHTML = `<div class="panel">
       <h2>Missions</h2>
-      <p class="hint">Objectifs à accomplir en jeu, avec récompense (Expérience, tampons, badge).</p>
+      <p class="hint">Objectifs à accomplir en jeu, avec récompense (Expérience, pièces, badge).</p>
       <button class="btn btn-primary" id="addMissionBtn" style="margin-bottom:12px;">${icon('plus')} Nouvelle mission</button>
       <div id="missionFormSlot"></div>
       <div class="entry-list" id="missionList" style="max-height:none;"></div>
@@ -534,7 +534,7 @@ function renderMain(){
 }
 /* ============================= COFFRES ============================= */
 // Taux de trouvaille des clés/coffres aux points d'intérêt (Version 20) et récompense obtenue à
-// l'ouverture (Expérience + tampons par couleur, depuis la Version 18) : tous réglables ici.
+// l'ouverture (Expérience + pièces par couleur, depuis la Version 18) : tous réglables ici.
 // Choix (Version 18) : les coffres ne donnent pas de Nœud Vert, seuls les points d'intérêt en
 // donnent — pour garder une source de capture unique et lisible.
 function renderChestsPanel(){
@@ -554,7 +554,7 @@ function renderChestsPanel(){
       <span style="width:20px;height:20px;border-radius:50%;background:${CHEST_COLOR_SWATCH[c]};box-shadow:0 0 0 2px var(--line) inset;flex:none;"></span>
       <div style="min-width:130px;flex:1;font-weight:800;">${CHEST_COLOR_LABEL[c]}<span class="hint" style="display:block;font-weight:600;margin:2px 0 0 0;">Ouverture : ${CHEST_OPEN_LABEL[c]}</span></div>
       <div class="field" style="flex:1;min-width:140px;"><label>Expérience à l'ouverture</label><input type="number" min="0" id="f_chest_xp_${c}" value="${r.xp}"></div>
-      <div class="field" style="flex:1;min-width:140px;"><label>Tampons à l'ouverture</label><input type="number" min="0" id="f_chest_coins_${c}" value="${r.coins}"></div>
+      <div class="field" style="flex:1;min-width:140px;"><label>Pièces à l'ouverture</label><input type="number" min="0" id="f_chest_coins_${c}" value="${r.coins}"></div>
     </div>`;
   }).join('');
   main.innerHTML = `<div class="panel">
@@ -595,7 +595,7 @@ function renderChestsPanel(){
 }
 
 /* ============================= BOUTIQUE ============================= */
-// Boutique (Version 19) : les joueurs dépensent leurs tampons dans l'onglet Inventaire pour
+// Boutique (Version 19) : les joueurs dépensent leurs pièces dans l'onglet Inventaire pour
 // acheter des clés (prix par couleur), terminer immédiatement l'ouverture d'un coffre en cours
 // (prix par couleur) ou acheter directement des Nœuds Verts (prix unique). Le fonctionnement des
 // Nœuds Verts reste fixé côté jeu ; les taux de trouvaille de clés/coffres se règlent désormais
@@ -607,19 +607,19 @@ function renderShopPanel(){
     return `<div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line);">
       <span style="width:20px;height:20px;border-radius:50%;background:${CHEST_COLOR_SWATCH[c]};box-shadow:0 0 0 2px var(--line) inset;flex:none;"></span>
       <div style="min-width:130px;flex:1;font-weight:800;">${CHEST_COLOR_LABEL[c]}</div>
-      <div class="field" style="flex:1;min-width:140px;"><label>Prix de la clé (tampons)</label><input type="number" min="0" id="f_shop_key_${c}" value="${data.shopConfig.keyPrices[c]}"></div>
+      <div class="field" style="flex:1;min-width:140px;"><label>Prix de la clé (pièces)</label><input type="number" min="0" id="f_shop_key_${c}" value="${data.shopConfig.keyPrices[c]}"></div>
     </div>`;
   }).join('');
   const skipRows = CHEST_COLORS.map(c=>{
     return `<div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line);">
       <span style="width:20px;height:20px;border-radius:50%;background:${CHEST_COLOR_SWATCH[c]};box-shadow:0 0 0 2px var(--line) inset;flex:none;"></span>
       <div style="min-width:130px;flex:1;font-weight:800;">${CHEST_COLOR_LABEL[c]}<span class="hint" style="display:block;font-weight:600;margin:2px 0 0 0;">Ouverture normale : ${CHEST_OPEN_LABEL[c]}</span></div>
-      <div class="field" style="flex:1;min-width:140px;"><label>Prix pour terminer immédiatement (tampons)</label><input type="number" min="0" id="f_shop_skip_${c}" value="${data.shopConfig.chestSkipPrices[c]}"></div>
+      <div class="field" style="flex:1;min-width:140px;"><label>Prix pour terminer immédiatement (pièces)</label><input type="number" min="0" id="f_shop_skip_${c}" value="${data.shopConfig.chestSkipPrices[c]}"></div>
     </div>`;
   }).join('');
   main.innerHTML = `<div class="panel">
     <h2>Boutique</h2>
-    <p class="hint">Dans l'onglet Inventaire du jeu, les joueurs peuvent dépenser leurs tampons pour acheter des clés, terminer immédiatement l'ouverture d'un coffre en cours, ou acheter directement des Nœuds Verts. Réglez ici les prix, en tampons.</p>
+    <p class="hint">Dans l'onglet Inventaire du jeu, les joueurs peuvent dépenser leurs pièces pour acheter des clés, terminer immédiatement l'ouverture d'un coffre en cours, ou acheter directement des Nœuds Verts. Réglez ici les prix, en pièces.</p>
     <h3 style="margin:18px 0 4px;">Clés</h3>
     <div class="form-card">${keyRows}</div>
     <h3 style="margin:18px 0 4px;">Terminer un coffre immédiatement</h3>
@@ -628,7 +628,7 @@ function renderShopPanel(){
     <div class="form-card">
       <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:10px 0;">
         <div style="min-width:130px;flex:1;font-weight:800;">Nœud Vert à l'unité</div>
-        <div class="field" style="flex:1;min-width:140px;"><label>Prix (tampons)</label><input type="number" min="0" id="f_shop_noeud" value="${data.shopConfig.noeudPrice}"></div>
+        <div class="field" style="flex:1;min-width:140px;"><label>Prix (pièces)</label><input type="number" min="0" id="f_shop_noeud" value="${data.shopConfig.noeudPrice}"></div>
       </div>
     </div>
     <div class="form-actions"><button class="btn btn-primary" id="saveShopBtn">Enregistrer</button></div>
@@ -649,14 +649,14 @@ function renderShopPanel(){
 }
 
 // Ballons rouges éphémères (Version 21) : réglages d'apparition (fréquence, durée de vie, rayon
-// autour du joueur) et de récompense (tampons/exp/Nœud Vert) — voir defaultBalloonConfig().
+// autour du joueur) et de récompense (pièces/exp/Nœud Vert) — voir defaultBalloonConfig().
 function renderBalloonsPanel(){
   const main = document.getElementById('mainArea');
   ensureBalloonConfig(data);
   const bc = data.balloonConfig;
   main.innerHTML = `<div class="panel">
     <h2>Ballons</h2>
-    <p class="hint">Un ballon rouge apparaît de temps en temps près du joueur, sur la carte du jeu ; s'il n'est pas éclaté à temps, il disparaît tout seul. En cliquant dessus (à moins de 60 m, comme les autres éléments de la carte), il éclate et donne tampons, expérience et Nœud(s) Vert.</p>
+    <p class="hint">Un ballon rouge apparaît de temps en temps près du joueur, sur la carte du jeu ; s'il n'est pas éclaté à temps, il disparaît tout seul. En cliquant dessus (à moins de 60 m, comme les autres éléments de la carte), il éclate et donne pièces, expérience et Nœud(s) Vert.</p>
     <h3 style="margin:18px 0 4px;">Apparition</h3>
     <div class="form-card">
       <div style="display:flex;flex-wrap:wrap;gap:12px;padding:10px 0;border-bottom:1px solid var(--line);">
@@ -673,8 +673,8 @@ function renderBalloonsPanel(){
     <h3 style="margin:22px 0 4px;">Récompense à l'éclatement</h3>
     <div class="form-card">
       <div style="display:flex;flex-wrap:wrap;gap:12px;padding:10px 0;">
-        <div class="field" style="flex:1;min-width:140px;"><label>Tampons min</label><input type="number" min="0" id="f_balloon_cmin" value="${bc.rewardCoinsMin}"></div>
-        <div class="field" style="flex:1;min-width:140px;"><label>Tampons max</label><input type="number" min="0" id="f_balloon_cmax" value="${bc.rewardCoinsMax}"></div>
+        <div class="field" style="flex:1;min-width:140px;"><label>Pièces min</label><input type="number" min="0" id="f_balloon_cmin" value="${bc.rewardCoinsMin}"></div>
+        <div class="field" style="flex:1;min-width:140px;"><label>Pièces max</label><input type="number" min="0" id="f_balloon_cmax" value="${bc.rewardCoinsMax}"></div>
         <div class="field" style="flex:1;min-width:140px;"><label>Expérience</label><input type="number" min="0" id="f_balloon_xp" value="${bc.rewardXp}"></div>
         <div class="field" style="flex:1;min-width:140px;"><label>Nœud Vert min</label><input type="number" min="0" id="f_balloon_nmin" value="${bc.rewardNoeudsMin}"></div>
         <div class="field" style="flex:1;min-width:140px;"><label>Nœud Vert max</label><input type="number" min="0" id="f_balloon_nmax" value="${bc.rewardNoeudsMax}"></div>
@@ -787,12 +787,12 @@ function renderMerchantForm(){
     <div class="section-title">Combat en boutique</div>
     <div class="shiny-box">
       <div class="field checkbox"><input type="checkbox" id="f_battle_enabled" ${m.battleEnabled?'checked':''}><label for="f_battle_enabled">Activer le combat pour ce commerçant</label></div>
-      <p class="small-note">Le code ci-dessous doit être écrit/affiché chez le commerçant (carton en caisse, QR code…). Un joueur sur place peut le saisir dans le jeu pour tenter sa chance à la roue (Expérience, tampons, et un bon de réduction s'il y en a un ci-dessous). Il doit être physiquement à proximité du commerçant pour que le code fonctionne, et ce code n'est jamais envoyé au jeu tant qu'il n'est pas validé — un joueur ne peut pas le voir en fouillant dans le jeu.</p>
+      <p class="small-note">Le code ci-dessous doit être écrit/affiché chez le commerçant (carton en caisse, QR code…). Un joueur sur place peut le saisir dans le jeu pour tenter sa chance à la roue (Expérience, pièces, et un bon de réduction s'il y en a un ci-dessous). Il doit être physiquement à proximité du commerçant pour que le code fonctionne, et ce code n'est jamais envoyé au jeu tant qu'il n'est pas validé — un joueur ne peut pas le voir en fouillant dans le jeu.</p>
       <div class="form-grid" style="margin-top:10px;">
         <div class="field"><label>Code secret</label><div class="icon-field-row"><input id="f_battle_code" value="${escapeHtml(m.battleCode||'')}" placeholder="Ex. NEVERS7"><button class="btn btn-ghost btn-sm" id="genBattleCodeBtn" type="button">Générer</button></div></div>
         <div class="field"><label>Bon de réduction (optionnel)</label><input id="f_battle_coupon" value="${escapeHtml(m.battleCouponLabel||'')}" placeholder="Ex. -10% sur un achat"></div>
       </div>
-      <p class="small-note">Laissez le bon de réduction vide pour un combat qui ne rapporte que de l'Expérience et des tampons. S'il est rempli, il sort de temps en temps sur la roue en plus des autres gains.</p>
+      <p class="small-note">Laissez le bon de réduction vide pour un combat qui ne rapporte que de l'Expérience et des pièces. S'il est rempli, il sort de temps en temps sur la roue en plus des autres gains.</p>
     </div>
 
     <div class="field checkbox" style="margin-top:14px;"><input type="checkbox" id="f_active" ${m.active!==false?'checked':''}><label for="f_active">Commerçant actif (visible en jeu)</label></div>
@@ -899,8 +899,8 @@ function renderPoiForm(){
     <div class="form-grid">
       <div class="field"><label>Nom</label><input id="f_pname" value="${escapeHtml(p.name)}" placeholder="Ex. Cathédrale Saint-Cyr"></div>
       <div class="field"><label>Icône</label><div class="icon-field-row"><div class="icon-preview" id="f_picon_preview"></div>${iconSelectHtml('f_picon', p.icon)}</div></div>
-      <div class="field"><label>Tampons min</label><input id="f_pcmin" type="number" min="0" value="${p.rewardCoinsMin}"></div>
-      <div class="field"><label>Tampons max</label><input id="f_pcmax" type="number" min="0" value="${p.rewardCoinsMax}"></div>
+      <div class="field"><label>Pièces min</label><input id="f_pcmin" type="number" min="0" value="${p.rewardCoinsMin}"></div>
+      <div class="field"><label>Pièces max</label><input id="f_pcmax" type="number" min="0" value="${p.rewardCoinsMax}"></div>
       <div class="field"><label>Expérience par visite</label><input id="f_pxp" type="number" min="0" value="${p.rewardXp}"></div>
       <div class="field"><label>Nœud Vert min</label><input id="f_pnmin" type="number" min="0" value="${p.rewardNoeudsMin!=null?p.rewardNoeudsMin:1}"></div>
       <div class="field"><label>Nœud Vert max</label><input id="f_pnmax" type="number" min="0" value="${p.rewardNoeudsMax!=null?p.rewardNoeudsMax:3}"></div>
@@ -939,7 +939,7 @@ function renderPoiForm(){
 /* ============================= EVENTS ============================= */
 const BONUS_TYPES = [
   {v:'none', label:'Aucun bonus mécanique (juste narratif)'},
-  {v:'double_tampons', label:'x2 tampons sur toutes les captures'},
+  {v:'double_tampons', label:'x2 pièces sur toutes les captures'},
   {v:'boost_species', label:"Apparitions boostées d'un commerçant"},
 ];
 function renderEventList(){
@@ -1017,7 +1017,7 @@ function renderMissionList(){
     <div class="entry-icon"><span style="--rarity:var(--blue-600);">${icon('flag')}</span></div>
     <div class="entry-main">
       <div class="entry-title">${escapeHtml(mi.title)}</div>
-      <div class="entry-sub">${(MISSION_TYPES.find(t=>t.v===mi.type)||{}).label||mi.type} · +${mi.rewardXp||0} exp, +${mi.rewardCoins||0} tampons</div>
+      <div class="entry-sub">${(MISSION_TYPES.find(t=>t.v===mi.type)||{}).label||mi.type} · +${mi.rewardXp||0} exp, +${mi.rewardCoins||0} pièces</div>
     </div>
     <button class="btn btn-sm btn-danger delbtn" data-id="${mi.id}">${icon('trash')}</button>
   </div>`).join('');
@@ -1044,7 +1044,7 @@ function renderMissionForm(){
     <div class="field" style="margin-top:12px;"><label>Description</label><textarea id="f_midesc" placeholder="Affichée au joueur">${escapeHtml(mi.description)}</textarea></div>
     <div class="form-grid" style="margin-top:12px;">
       <div class="field"><label>Récompense Expérience</label><input id="f_mixp" type="number" min="0" value="${mi.rewardXp||0}"></div>
-      <div class="field"><label>Récompense tampons</label><input id="f_micoins" type="number" min="0" value="${mi.rewardCoins||0}"></div>
+      <div class="field"><label>Récompense pièces</label><input id="f_micoins" type="number" min="0" value="${mi.rewardCoins||0}"></div>
       <div class="field"><label>Badge débloqué (optionnel)</label><select id="f_mibadge"><option value="">— aucun —</option>${data.badges.map(b=>`<option value="${b.id}" ${b.id===mi.rewardBadgeId?'selected':''}>${escapeHtml(b.label)}</option>`).join('')}</select></div>
     </div>
     <div class="field checkbox" style="margin-top:14px;"><input type="checkbox" id="f_miactive" ${mi.active!==false?'checked':''}><label for="f_miactive">Active</label></div>
