@@ -359,6 +359,51 @@ input.text-input:focus{outline:none; border-color:var(--blue-600);}
 .capture-result.fail{color:var(--brick);}
 .capture-result.partial{color:var(--rarity, var(--blue-600));}
 
+/* ---------- ouverture de coffre plein écran (Version 24, demande de Jérémy) ---------- */
+#chestOpenView{position:fixed; inset:0; z-index:700;
+  background:radial-gradient(120% 70% at 50% 0%, color-mix(in srgb, var(--cc) 24%, var(--blue-100)) 0%, var(--bg) 65%);
+  display:flex; flex-direction:column;}
+.chest-open-stage{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; padding:10px 20px;}
+.chest-open-hint{font-size:13px; color:var(--ink-soft); font-weight:800; margin:14px 0 0 0; transition:opacity .25s;}
+
+.chest3d{position:relative; width:180px; height:158px; margin:18px auto 2px; cursor:pointer; filter:drop-shadow(0 16px 16px rgba(0,0,0,.24));}
+.chest3d::after{ /* ombre portée au sol, pour ancrer visuellement le coffre */
+  content:''; position:absolute; left:16%; right:16%; bottom:-4px; height:14px; border-radius:50%;
+  background:radial-gradient(closest-side, rgba(0,0,0,.3), transparent 75%);
+}
+.chest-glow{position:absolute; left:50%; top:38%; width:20px;height:20px; border-radius:50%; transform:translate(-50%,-50%) scale(0); opacity:0; z-index:1;
+  background:radial-gradient(circle, #fffbe8 0%, color-mix(in srgb, var(--cc) 75%, #fff) 45%, transparent 72%); pointer-events:none;}
+.chest3d.open .chest-glow{animation:chestGlow .7s ease-out forwards;}
+@keyframes chestGlow{0%{transform:translate(-50%,-50%) scale(0); opacity:0;} 35%{opacity:1;} 100%{transform:translate(-50%,-50%) scale(11); opacity:0;}}
+.chest-body{
+  position:absolute; left:10px; right:10px; bottom:0; height:96px; border-radius:8px 8px 20px 20px; z-index:2; overflow:hidden;
+  background:linear-gradient(180deg, color-mix(in srgb, var(--cc) 88%, #fff 4%), color-mix(in srgb, var(--cc) 55%, #000 30%));
+  border:3px solid color-mix(in srgb, var(--cc) 35%, #000 45%);
+}
+.chest-body::before{ /* renfort métallique vertical */
+  content:''; position:absolute; left:50%; top:0; bottom:0; width:18px; transform:translateX(-50%);
+  background:linear-gradient(180deg,#ffe9a8,#c99a2e);
+}
+.chest3d.open .chest-body{box-shadow:inset 0 26px 30px -8px rgba(0,0,0,.55);}
+.chest-lock{
+  position:absolute; left:50%; top:52px; transform:translateX(-50%); width:28px;height:32px; border-radius:8px; z-index:4;
+  background:linear-gradient(180deg,#ffe9a8,#c99a2e); border:2px solid #8a611a; box-shadow:0 2px 5px rgba(0,0,0,.25);
+  display:flex; align-items:center; justify-content:center; transition:opacity .2s;
+}
+.chest3d.open .chest-lock{opacity:0;}
+.chest-lid{
+  position:absolute; left:2px; right:2px; top:0; height:72px; z-index:3;
+  border-radius:50% 50% 10px 10px / 72% 72% 10px 10px;
+  background:linear-gradient(180deg, color-mix(in srgb, var(--cc) 96%, #fff 14%), color-mix(in srgb, var(--cc) 60%, #000 18%));
+  border:3px solid color-mix(in srgb, var(--cc) 35%, #000 45%);
+  transition:transform .55s cubic-bezier(.25,.8,.3,1.4), opacity .35s ease .25s;
+}
+.chest-lid-band{position:absolute; left:50%; bottom:-4px; width:22px;height:11px; transform:translateX(-50%); border-radius:4px;
+  background:linear-gradient(180deg,#ffe9a8,#c99a2e); border:2px solid #8a611a;}
+.chest3d.shaking .chest-lid, .chest3d.shaking .chest-body{animation:chestShake .5s ease-in-out;}
+@keyframes chestShake{0%,100%{transform:translateX(0) rotate(0);} 20%{transform:translateX(-5px) rotate(-3deg);} 40%{transform:translateX(5px) rotate(3deg);} 60%{transform:translateX(-4px) rotate(-2deg);} 80%{transform:translateX(4px) rotate(2deg);}}
+.chest3d.open .chest-lid{transform:translateY(-96px) rotate(-24deg); opacity:0;}
+
 /* ---------- onboarding ---------- */
 #onboardBackdrop{position:fixed; inset:0; background:linear-gradient(160deg, var(--blue-800), var(--blue-600) 55%, var(--gold) 160%); z-index:800; display:flex; align-items:center; justify-content:center; padding:24px;}
 .onboard-card{width:min(92vw,420px); background:var(--surface); border-radius:28px; padding:28px 24px; box-shadow:var(--shadow-lg); text-align:center;}
@@ -1982,7 +2027,7 @@ function renderInventory(){
     ${noeudRowHtml}`;
 
   const collectBtn = document.getElementById('collectChestBtn');
-  if(collectBtn) collectBtn.onclick = collectChest;
+  if(collectBtn) collectBtn.onclick = openChestOpenView;
   el.querySelectorAll('.chest-open-btn').forEach(btn=>{
     if(!btn.disabled) btn.addEventListener('click', ()=> startChestOpen(btn.dataset.id));
   });
@@ -2038,17 +2083,68 @@ function startChestOpen(chestId){
   renderInventory();
   showToast(`Ouverture du coffre ${CHEST_COLOR_LABEL[color]} lancée (${fmtDuration(CHEST_OPEN_MS[color])}).`);
 }
-function collectChest(){
+// Écran plein écran d'ouverture de coffre (Version 24, demande de Jérémy) : avant, "Ouvrir" sur la
+// carte d'Inventaire déclenchait la récompense instantanément (juste une gerbe de particules sur la
+// petite icône). Désormais, ce bouton ouvre cet écran dédié avec un gros visuel du coffre à sa couleur
+// et l'invite "Appuyez pour l'ouvrir" ; la récompense n'est accordée qu'au moment où le joueur tape
+// dessus, avec une secousse d'anticipation puis l'animation du couvercle qui s'envole, une lueur et
+// une gerbe de confettis. Suit le même schéma que l'écran de capture (#captureView, rendu dans
+// #modalRoot, fermeture avec ré-affichage de l'écran du dessous).
+function openChestOpenView(){
   const opening = state.chestOpening;
   if(!opening || Date.now() < opening.readyAt) return;
-  // Position de la gerbe de particules capturée AVANT le re-rendu de l'Inventaire (qui va faire
-  // disparaître cette carte) — le calque de particules est indépendant du reste de la page (position
-  // fixed), donc l'effet reste visible même une fois la carte remplacée par la liste mise à jour.
-  const openingIconEl = document.querySelector('.chest-opening-card .chest-opening-icon');
-  const burstColors = [
-    getComputedStyle(document.documentElement).getPropertyValue('--chest-'+opening.color).trim() || '#eab545',
-    '#eab545', '#ffd873', '#ffffff'
-  ];
+  const color = opening.color;
+  const root = document.getElementById('modalRoot');
+  root.innerHTML = `
+    <div id="chestOpenView" style="--cc:var(--chest-${color});">
+      <div class="capture-top"><button class="capture-close" id="chestOpenCloseBtn">${icon('close','style="width:16px;height:16px;stroke:var(--ink-soft)"')}</button><div></div></div>
+      <div class="chest-open-stage">
+        <span class="rarity-tag" style="background:color-mix(in srgb, var(--cc) 20%, transparent); color:var(--cc);">Coffre ${CHEST_COLOR_LABEL[color]}</span>
+        <div class="chest3d" id="chestVisual">
+          <div class="chest-glow"></div>
+          <div class="chest-lid"><div class="chest-lid-band"></div></div>
+          <div class="chest-lock">${icon('key','style="width:13px;height:13px;stroke:#5b4110"')}</div>
+          <div class="chest-body"></div>
+        </div>
+        <p class="chest-open-hint" id="chestOpenHint">Appuyez sur le coffre pour l'ouvrir</p>
+        <div id="chestOpenResultWrap"></div>
+      </div>
+    </div>`;
+  document.getElementById('chestOpenCloseBtn').onclick = closeChestOpenView;
+  const visual = document.getElementById('chestVisual');
+  if(visual) visual.addEventListener('click', triggerChestOpen, {once:true});
+}
+function triggerChestOpen(){
+  const opening = state.chestOpening;
+  const visual = document.getElementById('chestVisual');
+  if(!opening || !visual) return;
+  const hint = document.getElementById('chestOpenHint');
+  if(hint) hint.style.opacity = '0';
+  // Petite secousse d'anticipation avant que le couvercle ne s'envole (même idée que le tremblement
+  // du portrait pendant une capture), pour marquer un temps d'attente avant la récompense.
+  visual.classList.add('shaking');
+  setTimeout(()=>{
+    visual.classList.remove('shaking');
+    visual.classList.add('open');
+    const c = elementCenter(visual);
+    const cc = getComputedStyle(document.documentElement).getPropertyValue('--chest-'+opening.color).trim() || '#eab545';
+    spawnParticles(c.x, c.y, [cc, '#eab545', '#ffd873', '#ffffff'], {count:20, spread:100, ring:true, ringSize:100});
+    setTimeout(()=>{
+      spawnParticles(c.x, c.y - 10, [cc, '#eab545', '#ffd873', '#ffffff', '#2f9e52', '#4fc3f7'], {count:46, spread:150, confetti:true});
+    }, 90);
+    setTimeout(()=>{
+      const reward = applyChestReward(opening);
+      const wrap = document.getElementById('chestOpenResultWrap');
+      if(wrap){
+        wrap.innerHTML = `<div class="capture-result success">Coffre ouvert !</div><p class="capture-hint">+${reward.xp} exp · +${reward.coins} pièces</p><button class="btn btn-primary" id="chestOpenDoneBtn" style="margin-top:10px;">Continuer</button>`;
+        document.getElementById('chestOpenDoneBtn').onclick = closeChestOpenView;
+      }
+    }, 600);
+  }, 500);
+}
+// Applique réellement la récompense (appelé une fois le couvercle envolé) : identique à l'ancien
+// comportement de collectChest, isolé dans sa propre fonction pour rester réutilisable/testable.
+function applyChestReward(opening){
   const reward = ACTIVE_CHEST_REWARDS[opening.color] || DEFAULT_CHEST_REWARDS[opening.color];
   state.xp += reward.xp;
   state.coins += reward.coins;
@@ -2057,12 +2153,12 @@ function collectChest(){
   saveLocal();
   renderStatusBar();
   renderInventory();
-  if(openingIconEl){
-    const c = elementCenter(openingIconEl);
-    spawnParticles(c.x, c.y, burstColors, {count:26, spread:110, ring:true, ringSize:70});
-  }
-  showToast(`Coffre ${CHEST_COLOR_LABEL[opening.color]} ouvert ! +${reward.xp} exp, +${reward.coins} pièces.`);
   checkMissions();
+  return reward;
+}
+function closeChestOpenView(){
+  document.getElementById('modalRoot').innerHTML = '';
+  renderInventory();
 }
 
 function renderProfile(){
