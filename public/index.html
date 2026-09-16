@@ -1174,6 +1174,132 @@ function elementCenter(el){
   const r = el.getBoundingClientRect();
   return { x: r.left + r.width/2, y: r.top + r.height/2 };
 }
+
+/* ============================= SONS (Version 25, demande de Jérémy) =============================
+   Tous les sons sont synthétisés directement en JavaScript via l'API Web Audio (oscillateurs +
+   enveloppes de volume), plutôt que d'utiliser des fichiers audio à héberger ou une bibliothèque
+   externe à charger (même contrainte réseau que pour Leaflet/MapTiler, documentée depuis la
+   Version 6 — mais ici ce n'est même pas nécessaire : un petit synthétiseur suffit pour des sons de
+   jeu courts et agréables, sans aucun poids supplémentaire au chargement). */
+const SOUND_PREF_KEY = 'pokenevers_sound_muted'; // préférence propre à cet appareil, volontairement
+// PAS incluse dans state/la sauvegarde par code (Version 16) : couper le son sur son téléphone ne
+// doit pas couper le son sur un autre appareil relié au même compte.
+let audioCtx = null;
+let soundMuted = (function(){ try{ return localStorage.getItem(SOUND_PREF_KEY) === '1'; }catch(e){ return false; } })();
+let musicTimer = null;
+function ensureAudioCtx(){
+  if(soundMuted) return null;
+  if(!audioCtx){
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if(!AC) return null;
+    try{ audioCtx = new AC(); }catch(e){ return null; }
+  }
+  if(audioCtx.state === 'suspended') audioCtx.resume().catch(()=>{});
+  return audioCtx;
+}
+// Un AudioContext ne peut démarrer qu'après un vrai geste de l'utilisateur (règle des navigateurs,
+// surtout stricte sur mobile) : on tente donc de le débloquer dès la toute première interaction avec
+// la page, pour que le premier effet sonore (souvent le tap d'onboarding) ne soit pas silencieux.
+['pointerdown','touchstart','click'].forEach(evt=>{
+  document.addEventListener(evt, ()=> ensureAudioCtx(), {once:true, passive:true});
+});
+function setSoundMuted(v){
+  soundMuted = v;
+  try{ localStorage.setItem(SOUND_PREF_KEY, v?'1':'0'); }catch(e){}
+  if(v) stopCaptureMusic();
+}
+// Joue une seule note avec une enveloppe douce (montée quasi instantanée, descente exponentielle) —
+// brique de base de tous les effets ci-dessous ; `slideTo` permet un léger glissando (montée/descente
+// de hauteur pendant la note, pour un rendu plus vivant qu'un simple bip).
+function playTone(freq, dur, opts){
+  const ctx = ensureAudioCtx();
+  if(!ctx) return;
+  opts = opts || {};
+  const t0 = ctx.currentTime + (opts.delay||0);
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = opts.type || 'sine';
+  osc.frequency.setValueAtTime(freq, t0);
+  if(opts.slideTo) osc.frequency.exponentialRampToValueAtTime(Math.max(1,opts.slideTo), t0+dur);
+  const peak = opts.gain!=null ? opts.gain : 0.16;
+  gain.gain.setValueAtTime(0.0001, t0);
+  gain.gain.exponentialRampToValueAtTime(peak, t0+0.012);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t0+dur);
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.start(t0);
+  osc.stop(t0+dur+0.02);
+}
+// Petite séquence de notes jouées à la suite (mélodies courtes : point d'intérêt, victoire, défaite,
+// ouverture de coffre...) — chaque note démarre à son propre décalage `at` (en secondes).
+function playSequence(notes, opts){
+  opts = opts || {};
+  notes.forEach(n=> playTone(n.freq, n.dur, {type:opts.type, gain:opts.gain, delay:n.at, slideTo:n.slideTo}));
+}
+// Point d'intérêt actionné : petit double "ding" clair et rapide, discret.
+function sfxPoi(){
+  playSequence([{freq:880, dur:0.11, at:0}, {freq:1318.5, dur:0.16, at:0.09}], {type:'sine', gain:0.14});
+}
+// Tap sur un Pokemerçant (ouverture de l'écran de capture) : un petit "pop" montant, curieux.
+function sfxSpawnTap(){
+  playTone(520, 0.14, {type:'triangle', gain:0.13, slideTo:820});
+}
+// Ouverture d'un coffre : courte fanfare ascendante à 4 notes, plus scintillante qu'un simple POI —
+// jouée au moment exact où le couvercle s'envole (voir triggerChestOpen).
+function sfxChestOpen(){
+  playSequence([
+    {freq:523.25, dur:0.14, at:0}, {freq:659.25, dur:0.14, at:0.1},
+    {freq:783.99, dur:0.14, at:0.2}, {freq:1046.5, dur:0.32, at:0.3},
+  ], {type:'triangle', gain:0.15});
+}
+// Achat en boutique (clé, fin de coffre, Nœud Vert) : un "cha-ching" bref, deux notes rapprochées sur
+// une onde carrée pour un grain un peu plus "pièce de monnaie" que les autres sons, plus doux/ronds.
+function sfxPurchase(){
+  playSequence([{freq:1046.5, dur:0.07, at:0}, {freq:1568, dur:0.12, at:0.06}], {type:'square', gain:0.09});
+}
+// Manche réussie pendant une capture à plusieurs manches (pas encore la capture finale) : un tic
+// positif discret, pour ne pas être confondu avec la vraie victoire (sfxVictory, plus riche).
+function sfxRoundWon(){
+  playTone(740, 0.12, {type:'sine', gain:0.12, slideTo:988});
+}
+// Victoire : capture réellement terminée (toutes les manches gagnées). Petite fanfare triomphante à
+// 5 notes, volontairement plus longue/riche que celle d'un coffre pour rester le son le plus marquant
+// du jeu (c'est l'évènement central de PokeNevers).
+function sfxVictory(){
+  playSequence([
+    {freq:523.25, dur:0.13, at:0}, {freq:659.25, dur:0.13, at:0.12}, {freq:783.99, dur:0.13, at:0.24},
+    {freq:1046.5, dur:0.38, at:0.36}, {freq:1318.5, dur:0.45, at:0.5},
+  ], {type:'triangle', gain:0.15});
+}
+// Défaite : le commerçant s'échappe (manche ratée, ou plus de Nœud Vert pour enchaîner). Deux notes
+// descendantes sur une onde sinus douce — un signal clair mais pas agressif ni punitif.
+function sfxDefeat(){
+  playSequence([{freq:392, dur:0.22, at:0}, {freq:293.66, dur:0.4, at:0.16}], {type:'sine', gain:0.13});
+}
+// Petite musique de fond en boucle pendant le mini-jeu de capture (légère tension), à faible volume
+// pour ne jamais couvrir les effets ci-dessus. Boucle courte (8 notes façon basse de jeu vidéo),
+// reprogrammée dès qu'elle se termine tant que l'écran de capture est ouvert (capture !== null) —
+// s'arrête d'elle-même sinon, sans minuteur qui continuerait à tourner en arrière-plan pour rien.
+const CAPTURE_MUSIC_PATTERN = [196.00, 196.00, 246.94, 196.00, 220.00, 196.00, 246.94, 293.66];
+const CAPTURE_MUSIC_STEP = 0.22;
+function scheduleCaptureMusicLoop(){
+  const ctx = ensureAudioCtx();
+  if(!ctx || !capture){ musicTimer = null; return; }
+  CAPTURE_MUSIC_PATTERN.forEach((freq,i)=> playTone(freq, CAPTURE_MUSIC_STEP*0.85, {type:'triangle', gain:0.05, delay:i*CAPTURE_MUSIC_STEP}));
+  musicTimer = setTimeout(scheduleCaptureMusicLoop, CAPTURE_MUSIC_PATTERN.length*CAPTURE_MUSIC_STEP*1000);
+}
+function startCaptureMusic(){
+  if(soundMuted || musicTimer) return;
+  scheduleCaptureMusicLoop();
+}
+function stopCaptureMusic(){
+  if(musicTimer){ clearTimeout(musicTimer); musicTimer = null; }
+}
+function toggleSound(){
+  setSoundMuted(!soundMuted);
+  if(!soundMuted) playTone(880, 0.1, {type:'sine', gain:0.12}); // petit retour sonore de confirmation en réactivant
+  if(activeView==='profile') renderProfile();
+}
 function spinPoi(p,i){
   const key = 'p'+i;
   const last = state.poiSpins[key]||0;
@@ -1184,6 +1310,7 @@ function spinPoi(p,i){
   }
   state.poiSpins[key]=Date.now();
   state.totalPoiSpins = (state.totalPoiSpins||0)+1;
+  sfxPoi();
   // Gerbe de confettis au point exact du marqueur, en plus de la rotation de l'icône (déjà
   // déclenchée par spinPoiIcon) — seulement quand la récompense est vraiment accordée, pas sur
   // un tap bloqué par le temps de recharge. Passée en mode confettis et bien plus fournie en
@@ -1350,6 +1477,7 @@ function onGeo(lat,lon){
 /* ============================= CAPTURE ============================= */
 let capture=null;
 function openCapture(sp){
+  sfxSpawnTap();
   const species = getSpeciesById(sp.speciesId);
   const stageIdx = (state.captures[sp.speciesId]?.stage)||0;
   const stage = species.stages[Math.min(stageIdx, species.stages.length-1)];
@@ -1383,6 +1511,7 @@ function openCapture(sp){
   document.getElementById('throwBtn').onclick = doThrow;
   updateCaptureRounds();
   requestAnimationFrame(captureLoop);
+  startCaptureMusic();
 }
 function updateCaptureRounds(){
   if(!capture || capture.roundsTotal<=1) return;
@@ -1422,6 +1551,7 @@ function doThrow(){
     if(success){
       capture.roundsWon++;
       if(capture.roundsWon < capture.roundsTotal && state.noeudsVerts>0){
+        sfxRoundWon();
         portrait.classList.remove('shake');
         portrait.classList.add('round-won');
         setTimeout(()=> portrait && portrait.classList.remove('round-won'), 500);
@@ -1439,10 +1569,14 @@ function doThrow(){
       } else if(capture.roundsWon < capture.roundsTotal){
         // Plus aucun Nœud Vert pour enchaîner une manche supplémentaire : la cible s'échappe,
         // malgré la dernière manche réussie (comme à court de Poké Balls face à un Pokémon coriace).
+        sfxDefeat();
+        stopCaptureMusic();
         wrap.innerHTML = `<div class="capture-result fail">Plus de Nœud Vert : il s'échappe…</div><p class="capture-hint">Refaites une réserve sur un point d'intérêt avant de retenter votre chance.</p><button class="btn btn-ghost" id="captureDoneBtn" style="margin-top:10px;">Fermer</button>`;
         document.getElementById('captureDoneBtn').onclick = closeCapture;
       } else {
         applyCapture(capture.species, capture.spawnUid);
+        sfxVictory();
+        stopCaptureMusic();
         wrap.innerHTML = `<div class="capture-result success">Capturé !</div><p class="capture-hint">+${RARITY_XP[capture.species.rarity]} exp · +${RARITY_CANDY[capture.species.rarity]} pièces</p><button class="btn btn-primary" id="captureDoneBtn" style="margin-top:10px;">Continuer</button>`;
         document.getElementById('captureDoneBtn').onclick = closeCapture;
         // Confettis de célébration (Version 23, demande de Jérémy) sur une capture réellement
@@ -1455,6 +1589,8 @@ function doThrow(){
         }
       }
     } else {
+      sfxDefeat();
+      stopCaptureMusic();
       const outOfNoeuds = state.noeudsVerts<=0;
       wrap.innerHTML = `<div class="capture-result fail">Il s'est échappé…</div><p class="capture-hint">Retentez votre chance sur un prochain passage.</p>${outOfNoeuds?`<p class="capture-hint" style="color:var(--brick-dark); font-weight:700;">Plus de Nœud Vert ! Direction un point d'intérêt pour vous refaire une réserve.</p>`:''}<button class="btn btn-ghost" id="captureDoneBtn" style="margin-top:10px;">Fermer</button>`;
       document.getElementById('captureDoneBtn').onclick = closeCapture;
@@ -1476,7 +1612,7 @@ function applyCapture(species, spawnUid){
   renderSpawnMarkers();
   checkMissions();
 }
-function closeCapture(){ capture=null; document.getElementById('modalRoot').innerHTML=''; }
+function closeCapture(){ stopCaptureMusic(); capture=null; document.getElementById('modalRoot').innerHTML=''; }
 
 /* ============================= STATUS BAR ============================= */
 function renderStatusBar(){
@@ -2044,6 +2180,7 @@ function buyKey(color){
   if(state.coins < price){ showToast(`Pas assez de pièces (il faut ${price}).`); return; }
   state.coins -= price;
   state.keys[color] = (state.keys[color]||0)+1;
+  sfxPurchase();
   saveLocal();
   renderStatusBar();
   renderInventory();
@@ -2056,6 +2193,7 @@ function buySkipChest(){
   if(state.coins < price){ showToast(`Pas assez de pièces (il faut ${price}).`); return; }
   state.coins -= price;
   opening.readyAt = Date.now();
+  sfxPurchase();
   saveLocal();
   renderStatusBar();
   renderInventory();
@@ -2066,6 +2204,7 @@ function buyNoeud(){
   if(state.coins < price){ showToast(`Pas assez de pièces (il faut ${price}).`); return; }
   state.coins -= price;
   state.noeudsVerts += 1;
+  sfxPurchase();
   saveLocal();
   renderStatusBar();
   renderInventory();
@@ -2126,6 +2265,7 @@ function triggerChestOpen(){
   setTimeout(()=>{
     visual.classList.remove('shaking');
     visual.classList.add('open');
+    sfxChestOpen();
     const c = elementCenter(visual);
     const cc = getComputedStyle(document.documentElement).getPropertyValue('--chest-'+opening.color).trim() || '#eab545';
     spawnParticles(c.x, c.y, [cc, '#eab545', '#ffd873', '#ffffff'], {count:20, spread:100, ring:true, ringSize:100});
@@ -2180,6 +2320,14 @@ function renderProfile(){
     </div>
     <h2 style="font-size:16px;margin:22px 0 0 0;">Badges</h2>
     <div class="badge-grid">${badgeHtml}</div>
+    <h2 style="font-size:16px;margin:22px 0 0 0;">Sons</h2>
+    <div style="background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-md);padding:14px 16px;box-shadow:var(--shadow-sm);display:flex;align-items:center;justify-content:space-between;gap:12px;">
+      <div>
+        <strong style="font-family:'Fredoka';font-size:14px;">Effets sonores</strong>
+        <p class="sub" style="margin:2px 0 0 0;">Points d'intérêt, captures, coffres, achats, musique de capture...</p>
+      </div>
+      <button class="btn ${soundMuted?'btn-ghost':'btn-primary'}" id="toggleSoundBtn" style="width:auto;padding:10px 18px;flex:none;">${soundMuted?'🔇 Coupés':'🔊 Activés'}</button>
+    </div>
     <h2 style="font-size:16px;margin:22px 0 0 0;">Sauvegarde multi-appareils</h2>
     <div style="background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-md);padding:14px 16px;box-shadow:var(--shadow-sm);">
       ${state.syncCode ? `
@@ -2203,6 +2351,8 @@ function renderProfile(){
     </div>
     <div class="info-note">${usingLiveMerchants ? "Vrais commerçants de Nevers, vraie carte OpenStreetMap et vrai GPS." : "Version prototype : commerçants fictifs, mais vraie carte OpenStreetMap et vrai GPS. Un panel d'administration permet d'ajouter les vrais commerçants, POI et évènements."} Sans code de sauvegarde, la progression reste uniquement sur cet appareil.</div>
     <button class="btn btn-ghost" id="resetBtn" style="margin-top:16px;">Réinitialiser ma progression</button>`;
+  const toggleSoundBtn = document.getElementById('toggleSoundBtn');
+  if(toggleSoundBtn) toggleSoundBtn.onclick = toggleSound;
   const copyBtn = document.getElementById('copySyncBtn');
   if(copyBtn) copyBtn.onclick = ()=>{
     if(navigator.clipboard && navigator.clipboard.writeText){
